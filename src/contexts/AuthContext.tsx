@@ -79,8 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [buildUserFromAuth]);
 
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
-
+    // Don't set global loading state - let the Login component handle its own loading state
     try {
       // Authenticate with Supabase Auth
       const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -89,8 +88,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (authError) {
-        setLoading(false);
-
         // Provide user-friendly error messages
         if (authError.message.toLowerCase().includes('invalid login credentials') ||
             authError.message.toLowerCase().includes('invalid credentials')) {
@@ -107,7 +104,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!data.user) {
-        setLoading(false);
         return { error: 'Authentication failed. Please try again or contact your administrator.' };
       }
 
@@ -118,11 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userProfile);
       setSession(data.session);
       setAuthUser(data.user);
-      setLoading(false);
       return { error: null };
     } catch (err) {
       await supabase.auth.signOut();
-      setLoading(false);
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
       console.error('Login error:', err);
       return { error: `Login failed: ${errorMessage}. Please contact your administrator for assistance.` };

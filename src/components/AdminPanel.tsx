@@ -839,7 +839,7 @@ export default function AdminPanel() {
                       </div>
                       <div className="text-sm text-gray-500 mt-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono">{user.email.split('@')[0]}</span>
+                          <span className="font-mono">{user.email}</span>
                           {user.temp_password && (
                             <>
                               <span>•</span>
