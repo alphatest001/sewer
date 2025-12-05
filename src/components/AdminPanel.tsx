@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Trash2, Users, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ConfirmDialog from './ConfirmDialog';
+import UserCredentialsModal from './UserCredentialsModal';
 
 type TabType = 'cities' | 'zones' | 'wards' | 'locations' | 'engineers' | 'executive_engineers' | 'users';
 
@@ -73,6 +74,15 @@ export default function AdminPanel() {
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [credentialsModal, setCredentialsModal] = useState<{
+    isOpen: boolean;
+    userId: string;
+    password: string;
+  }>({
+    isOpen: false,
+    userId: '',
+    password: ''
+  });
 
   useEffect(() => {
     fetchAllData();
@@ -310,7 +320,13 @@ export default function AdminPanel() {
         cityId: ''
       });
       fetchAllData();
-      alert(`User account created successfully!\n\nUser ID: ${data.userIdDisplay}\nPassword: ${data.password}\n\nPlease save these credentials.`);
+
+      // Show credentials modal
+      setCredentialsModal({
+        isOpen: true,
+        userId: data.email,
+        password: data.password
+      });
     } catch (error: any) {
       console.error('Error creating user:', error);
       alert(error.message || 'Failed to create user account.');
@@ -347,7 +363,17 @@ export default function AdminPanel() {
 
       // Refresh user list to get updated password
       await fetchAllData();
-      alert(`Password reset successfully!\n\nNew Password: ${data.newPassword}\n\nPlease save this password.`);
+
+      // Get the user's email to display in modal
+      const user = users.find(u => u.id === userId);
+      const userEmail = user?.email || '';
+
+      // Show credentials modal with new password
+      setCredentialsModal({
+        isOpen: true,
+        userId: userEmail,
+        password: data.newPassword
+      });
     } catch (error: any) {
       console.error('Error resetting password:', error);
       alert(error.message || 'Failed to reset password.');
@@ -905,6 +931,13 @@ export default function AdminPanel() {
         type="danger"
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
+      />
+
+      <UserCredentialsModal
+        isOpen={credentialsModal.isOpen}
+        userId={credentialsModal.userId}
+        password={credentialsModal.password}
+        onClose={() => setCredentialsModal({ isOpen: false, userId: '', password: '' })}
       />
     </div>
   );
