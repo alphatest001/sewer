@@ -1,0 +1,50 @@
+================================================================================
+IMPORTANT: ENVIRONMENT VARIABLES SETUP
+================================================================================
+
+The .env file is required for the application to work. Please create it manually.
+
+STEP 1: Create a file named ".env" in the project root directory
+        (same location as package.json)
+
+STEP 2: Copy and paste the following content into the .env file:
+
+--------------------------------------------------------------------------------
+# Supabase Configuration
+VITE_SUPABASE_URL=https://djeauecionobyhdmjlnb.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZWF1ZWNpb25vYnloZG1qbG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNTI5NjIsImV4cCI6MjA2NDYyODk2Mn0.pu3S0ELfN59Hp2wTcHYVHQb7oZjkdZP3LOQfZF0RjBg
+
+# Cloudflare R2 (for media uploads)
+VITE_CLOUDFLARE_ACCOUNT_ID=301d8d34d093932b5b369edf690aa325
+VITE_CLOUDFLARE_R2_ACCESS_KEY_ID=1618f8c6de6ddc7c6896297cca71d00e
+VITE_CLOUDFLARE_R2_SECRET_ACCESS_KEY=46a3b1ffc2ac913c50d0e01abf86c2e0878049f0948e042976927542bca304a2
+VITE_CLOUDFLARE_R2_BUCKET_NAME=sewer
+VITE_CLOUDFLARE_R2_PUBLIC_URL=https://pub-ce85aff3dd904ca7be2a77a0c08e88e5.r2.dev
+--------------------------------------------------------------------------------
+
+STEP 3: Save the file
+
+STEP 4: Restart the development server if it's already running:
+        - Stop the server (Ctrl+C)
+        - Run: npm run dev
+
+================================================================================
+VERIFICATION
+================================================================================
+
+After creating the .env file, you should be able to:
+1. See the login page load correctly
+2. See cities in the dropdown (after clicking refresh if needed)
+3. Click "Setup Admin Account" button
+4. Login successfully
+
+If you still have issues, check:
+- The .env file is in the correct location (project root)
+- The file is named exactly ".env" (not .env.txt)
+- There are no extra spaces or quotes around the values
+- The development server was restarted after creating the file
+
+================================================================================
+
+
+

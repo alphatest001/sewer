@@ -1,0 +1,37 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         CORRECT .env FILE CONTENTS                            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+⚠️  IMPORTANT: Your current .env file has INVALID credentials!
+    Please UPDATE your .env file with these CORRECT values:
+
+================================================================================
+COPY EVERYTHING BELOW INTO YOUR .env FILE:
+================================================================================
+
+VITE_SUPABASE_URL=https://djeauecionobyhdmjlnb.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZWF1ZWNpb25vYnloZG1qbG5iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ4MTU5ODYsImV4cCI6MjA4MDM5MTk4Nn0.GmxRAE9J34KAydV4jksa79Atm6wIP7r45OZ7hmcc58w
+
+================================================================================
+
+STEPS TO FIX:
+================================================================================
+
+1. Open your .env file (located in the project root: C:\Users\Harsh\OneDrive\Desktop\sewer\.env)
+
+2. REPLACE the entire contents with the two lines above
+
+3. Save the file
+
+4. The dev server will automatically reload - just wait a few seconds
+
+5. Refresh your browser at http://localhost:5174
+
+================================================================================
+
+✅ After updating, you should see cities loading instead of "Invalid API key" errors!
+
+Note: These credentials are specifically for YOUR Supabase project and are safe to use.
+
+
+

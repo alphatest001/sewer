@@ -1,0 +1,56 @@
+{
+  "mcpServers": {
+    "browsermcp": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@browsermcp/mcp@latest"
+      ],
+      "autoapprove": [
+        "*"
+      ]
+    },
+    "chrome-devtools": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless",
+        "--isolated"
+      ],
+      "autoapprove": [
+        "*"
+      ]
+    },
+    "testsprite": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@testsprite/testsprite-mcp@latest"
+      ],
+      "env": {
+        "API_KEY": "your-testsprite-api-key-here"
+      },
+      "autoapprove": [
+        "*"
+      ]
+    },
+    "supabase": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "pnpm",
+        "dlx",
+        "@supabase/mcp-server-supabase@latest",
+        "--project-ref=djeauecionobyhdmjlnb"
+      ],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "sbp_fc67b6a15d79e7a2cfa0a8cc1de3038ec79246c0"
+      }
+    }
+  }
+}
