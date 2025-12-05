@@ -3,6 +3,7 @@ import { Plus, Trash2, Users, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ConfirmDialog from './ConfirmDialog';
 import UserCredentialsModal from './UserCredentialsModal';
+import ErrorModal from './ErrorModal';
 
 type TabType = 'cities' | 'zones' | 'wards' | 'locations' | 'engineers' | 'executive_engineers' | 'users';
 
@@ -83,6 +84,13 @@ export default function AdminPanel() {
     userId: '',
     password: ''
   });
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    message: string;
+  }>({
+    isOpen: false,
+    message: ''
+  });
 
   useEffect(() => {
     fetchAllData();
@@ -106,7 +114,10 @@ export default function AdminPanel() {
       if (usersRes.data) setUsers(usersRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
-      alert('Failed to load data. Please refresh the page.');
+      setErrorModal({
+        isOpen: true,
+        message: 'Failed to load data. Please refresh the page.'
+      });
     } finally {
       setLoading(false);
     }
@@ -162,7 +173,10 @@ export default function AdminPanel() {
       }
     } catch (error: any) {
       console.error(`Error deleting ${deleteConfirm.type}:`, error);
-      alert(error.message || `Failed to delete ${deleteConfirm.type}.`);
+      setErrorModal({
+        isOpen: true,
+        message: error.message || `Failed to delete ${deleteConfirm.type}.`
+      });
     } finally {
       setDeleteConfirm({ isOpen: false, type: null, id: null, name: null });
     }
@@ -272,7 +286,10 @@ export default function AdminPanel() {
   // User operations
   const handleAddUser = async () => {
     if (!newUser.fullName || !newUser.cityId) {
-      alert('Please fill in all required fields.');
+      setErrorModal({
+        isOpen: true,
+        message: 'Please fill in all required fields.'
+      });
       return;
     }
 
@@ -287,30 +304,23 @@ export default function AdminPanel() {
         }
       });
 
-      // Handle Edge Function errors
-      if (error) {
-        // Try to extract the actual error message from the Edge Function response
-        let errorMessage = 'Failed to create user';
+      // Handle Edge Function errors - check data first because error details are in the response body
+      if (error || !data?.success) {
+        console.error('Edge Function error:', error);
+        console.error('Edge Function response data:', data);
 
-        if (error.context?.body) {
-          try {
-            const errorBody = await error.context.body;
-            const errorText = await (errorBody instanceof ReadableStream
-              ? new Response(errorBody).text()
-              : errorBody);
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.error || errorMessage;
-          } catch (parseError) {
-            console.error('Could not parse error response:', parseError);
-          }
+        // Extract the actual error message from the response data
+        let errorMessage = 'Failed to create user. Please try again.';
+
+        if (data?.error) {
+          // Error message is in the response body
+          errorMessage = data.error;
+        } else if (error?.message && !error.message.includes('non-2xx status code')) {
+          // Use error.message only if it's not the generic message
+          errorMessage = error.message;
         }
 
         throw new Error(errorMessage);
-      }
-
-      // Check response success flag
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to create user account');
       }
 
       // Success - reset form and refresh data
@@ -319,7 +329,7 @@ export default function AdminPanel() {
         role: 'engineer',
         cityId: ''
       });
-      fetchAllData();
+      await fetchAllData();
 
       // Show credentials modal
       setCredentialsModal({
@@ -329,7 +339,11 @@ export default function AdminPanel() {
       });
     } catch (error: any) {
       console.error('Error creating user:', error);
-      alert(error.message || 'Failed to create user account.');
+      // Show error in modal instead of alert
+      setErrorModal({
+        isOpen: true,
+        message: error.message || 'An unexpected error occurred. Please try again.'
+      });
     } finally {
       setIsCreatingUser(false);
     }
@@ -337,7 +351,10 @@ export default function AdminPanel() {
 
   const handleDeleteUser = (userId: string, userRole: string, userName: string) => {
     if (userRole === 'admin') {
-      alert('Admin accounts cannot be deleted.');
+      setErrorModal({
+        isOpen: true,
+        message: 'Admin accounts cannot be deleted.'
+      });
       return;
     }
     promptDelete('user', userId, userName);
@@ -376,7 +393,10 @@ export default function AdminPanel() {
       });
     } catch (error: any) {
       console.error('Error resetting password:', error);
-      alert(error.message || 'Failed to reset password.');
+      setErrorModal({
+        isOpen: true,
+        message: error.message || 'Failed to reset password.'
+      });
     }
   };
 
@@ -938,6 +958,12 @@ export default function AdminPanel() {
         userId={credentialsModal.userId}
         password={credentialsModal.password}
         onClose={() => setCredentialsModal({ isOpen: false, userId: '', password: '' })}
+      />
+
+      <ErrorModal
+        isOpen={errorModal.isOpen}
+        message={errorModal.message}
+        onClose={() => setErrorModal({ isOpen: false, message: '' })}
       />
     </div>
   );

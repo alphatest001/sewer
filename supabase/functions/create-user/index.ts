@@ -39,11 +39,11 @@ async function generateUserId(supabase: any, role: string): Promise<string> {
       prefix = 'USER';
   }
 
-  // Find the next available number
+  // Find the next available number (use ilike for case-insensitive matching)
   const { data: existingUsers } = await supabase
     .from('users')
     .select('email')
-    .like('email', `${prefix}%@varman.local`)
+    .ilike('email', `${prefix}%@varman.local`)
     .order('email', { ascending: false })
     .limit(1);
 
@@ -142,7 +142,7 @@ Deno.serve(async (req: Request) => {
 
     // Generate user ID and password
     const userId = await generateUserId(supabase, body.role);
-    const email = `${userId}@varman.local`;
+    const email = `${userId}@varman.local`.toLowerCase(); // Ensure lowercase to match Supabase auth behavior
     const password = generatePassword(8);
 
     console.log(`[CREATE-USER] Generated credentials - Email: ${email}, Password: ${password}`);
