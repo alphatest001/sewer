@@ -9,6 +9,7 @@ interface NumericInputProps {
   label: string;
   required?: boolean;
   disabled?: boolean;
+  hideButtons?: boolean;
 }
 
 export default function NumericInput({
@@ -19,7 +20,8 @@ export default function NumericInput({
   step = 0.1,
   label,
   required = false,
-  disabled = false
+  disabled = false,
+  hideButtons = false
 }: NumericInputProps) {
   const handleIncrement = () => {
     const newValue = Math.min(max, value + step);
@@ -42,14 +44,16 @@ export default function NumericInput({
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleDecrement}
-          disabled={disabled}
-          className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-        >
-          <Minus className="w-5 h-5 text-gray-600" />
-        </button>
+        {!hideButtons && (
+          <button
+            type="button"
+            onClick={handleDecrement}
+            disabled={disabled}
+            className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+          >
+            <Minus className="w-5 h-5 text-gray-600" />
+          </button>
+        )}
         <input
           type="number"
           value={value}
@@ -61,14 +65,16 @@ export default function NumericInput({
           className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-center font-semibold disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
           required={required}
         />
-        <button
-          type="button"
-          onClick={handleIncrement}
-          disabled={disabled}
-          className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-        >
-          <Plus className="w-5 h-5 text-gray-600" />
-        </button>
+        {!hideButtons && (
+          <button
+            type="button"
+            onClick={handleIncrement}
+            disabled={disabled}
+            className="w-10 h-10 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
+          >
+            <Plus className="w-5 h-5 text-gray-600" />
+          </button>
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ interface WorkEntry {
   remark: string | null;
   video_url: string | null;
   image_url: string | null;
+  engineer_id: string;
+  executive_engineer_id: string | null;
   city: { name: string };
   zone: { name: string };
   ward: { name: string };
@@ -46,6 +48,12 @@ interface Location {
   ward_id: string;
 }
 
+interface Engineer {
+  id: string;
+  name: string;
+  city_id: string | null;
+}
+
 export default function WorkHistory() {
   const { user, authUser } = useAuth();
   const [entries, setEntries] = useState<WorkEntry[]>([]);
@@ -63,10 +71,16 @@ export default function WorkHistory() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
+  // Engineer data
+  const [engineers, setEngineers] = useState<Engineer[]>([]);
+  const [executiveEngineers, setExecutiveEngineers] = useState<Engineer[]>([]);
+
   // Available options based on filter selections
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [availableWards, setAvailableWards] = useState<Ward[]>([]);
   const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
+  const [availableEngineers, setAvailableEngineers] = useState<Engineer[]>([]);
+  const [availableExecutiveEngineers, setAvailableExecutiveEngineers] = useState<Engineer[]>([]);
 
   const [filters, setFilters] = useState({
     cityId: '',
@@ -74,7 +88,9 @@ export default function WorkHistory() {
     dateTo: '',
     zoneId: '',
     wardId: '',
-    locationId: ''
+    locationId: '',
+    engineerId: '',
+    executiveEngineerId: ''
   });
 
   useEffect(() => {
@@ -82,34 +98,90 @@ export default function WorkHistory() {
     fetchMasterData();
   }, [user]);
 
-  // Update available zones when city filter changes
+  // Auto-select city for non-admin users
   useEffect(() => {
-    setAvailableZones(zones);
-  }, [zones]);
+    if (user && user.role !== 'admin' && user.city_id) {
+      setFilters(prev => ({ ...prev, cityId: user.city_id || '' }));
+    }
+  }, [user]);
 
-  // Update available wards
+  // Cascade: City → Zones
   useEffect(() => {
-    setAvailableWards(wards);
-  }, [wards]);
+    if (filters.cityId) {
+      const cityZones = zones.filter(z => z.city_id === filters.cityId);
+      setAvailableZones(cityZones);
+    } else {
+      setAvailableZones(zones);
+    }
+  }, [filters.cityId, zones]);
 
-  // Update available locations
+  // Cascade: Zone → Wards
   useEffect(() => {
-    setAvailableLocations(locations);
-  }, [locations]);
+    if (filters.zoneId) {
+      const zoneWards = wards.filter(w => w.zone_id === filters.zoneId);
+      setAvailableWards(zoneWards);
+    } else if (filters.cityId) {
+      const cityZoneIds = zones.filter(z => z.city_id === filters.cityId).map(z => z.id);
+      const relevantWards = wards.filter(w => cityZoneIds.includes(w.zone_id));
+      setAvailableWards(relevantWards);
+    } else {
+      setAvailableWards(wards);
+    }
+  }, [filters.cityId, filters.zoneId, zones, wards]);
+
+  // Cascade: Ward → Locations
+  useEffect(() => {
+    if (filters.wardId) {
+      const wardLocations = locations.filter(l => l.ward_id === filters.wardId);
+      setAvailableLocations(wardLocations);
+    } else if (filters.zoneId) {
+      const zoneWardIds = wards.filter(w => w.zone_id === filters.zoneId).map(w => w.id);
+      const relevantLocations = locations.filter(l => zoneWardIds.includes(l.ward_id));
+      setAvailableLocations(relevantLocations);
+    } else if (filters.cityId) {
+      const cityZoneIds = zones.filter(z => z.city_id === filters.cityId).map(z => z.id);
+      const relevantWardIds = wards.filter(w => cityZoneIds.includes(w.zone_id)).map(w => w.id);
+      const relevantLocations = locations.filter(l => relevantWardIds.includes(l.ward_id));
+      setAvailableLocations(relevantLocations);
+    } else {
+      setAvailableLocations(locations);
+    }
+  }, [filters.cityId, filters.zoneId, filters.wardId, zones, wards, locations]);
+
+  // Cascade: City → Engineers
+  useEffect(() => {
+    if (filters.cityId) {
+      const cityEngineers = engineers.filter(e => e.city_id === filters.cityId);
+      setAvailableEngineers(cityEngineers);
+      const cityExecEngineers = executiveEngineers.filter(e => e.city_id === filters.cityId);
+      setAvailableExecutiveEngineers(cityExecEngineers);
+    } else {
+      setAvailableEngineers(engineers);
+      setAvailableExecutiveEngineers(executiveEngineers);
+    }
+  }, [filters.cityId, engineers, executiveEngineers]);
 
   const fetchMasterData = async () => {
     try {
-      const [citiesRes, zonesRes, wardsRes, locationsRes] = await Promise.all([
+      const [citiesRes, zonesRes, wardsRes, locationsRes, engineersRes, execEngineersRes] = await Promise.all([
         supabase.from('cities').select('*').order('name'),
         supabase.from('zones').select('*').order('name'),
         supabase.from('wards').select('*').order('name'),
-        supabase.from('locations').select('*').order('name')
+        supabase.from('locations').select('*').order('name'),
+        supabase.from('users').select('id, full_name, city_id').eq('role', 'engineer').order('full_name'),
+        supabase.from('users').select('id, full_name, city_id').eq('role', 'executive_engineer').order('full_name')
       ]);
 
       if (citiesRes.data) setCities(citiesRes.data);
       if (zonesRes.data) setZones(zonesRes.data);
       if (wardsRes.data) setWards(wardsRes.data);
       if (locationsRes.data) setLocations(locationsRes.data);
+      if (engineersRes.data) {
+        setEngineers(engineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
+      }
+      if (execEngineersRes.data) {
+        setExecutiveEngineers(execEngineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
+      }
     } catch (error) {
       console.error('Error fetching master data:', error);
     }
@@ -130,7 +202,8 @@ export default function WorkHistory() {
           ward:wards(name),
           location:locations(name),
           engineer:users!work_entries_engineer_id_fkey(full_name),
-          executive_engineer:users!work_entries_executive_engineer_id_fkey(full_name)
+          executive_engineer:users!work_entries_executive_engineer_id_fkey(full_name),
+          media:work_entry_media(*)
         `)
         .order('work_date', { ascending: false });
 
@@ -211,8 +284,40 @@ export default function WorkHistory() {
     if (filters.dateTo && entry.work_date > filters.dateTo) {
       return false;
     }
+    // Engineer filter
+    if (filters.engineerId && entry.engineer_id !== filters.engineerId) {
+      return false;
+    }
+    // Executive Engineer filter
+    if (filters.executiveEngineerId && entry.executive_engineer_id !== filters.executiveEngineerId) {
+      return false;
+    }
     return true;
   });
+
+  const handleFilterChange = (name: string, value: string) => {
+    setFilters(prev => {
+      const updated = { ...prev, [name]: value };
+
+      // Reset downstream filters when upstream changes
+      if (name === 'cityId') {
+        updated.zoneId = '';
+        updated.wardId = '';
+        updated.locationId = '';
+        updated.engineerId = '';
+        updated.executiveEngineerId = '';
+      }
+      if (name === 'zoneId') {
+        updated.wardId = '';
+        updated.locationId = '';
+      }
+      if (name === 'wardId') {
+        updated.locationId = '';
+      }
+
+      return updated;
+    });
+  };
 
   const totalHours = filteredEntries.reduce((sum, entry) => {
     const hours = entry.chmr - entry.shmr;
@@ -239,13 +344,19 @@ export default function WorkHistory() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-2xl font-semibold text-gray-900 mb-6">Work History</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              City
+              {user && user.role !== 'admin' && user.city_id && (
+                <span className="ml-2 text-xs text-blue-600">(Auto-selected)</span>
+              )}
+            </label>
             <select
               value={filters.cityId}
-              onChange={(e) => setFilters(prev => ({ ...prev, cityId: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              onChange={(e) => handleFilterChange('cityId', e.target.value)}
+              disabled={user?.role !== 'admin' && !!user?.city_id}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value="">All Cities</option>
               {cities.map(city => (
@@ -259,7 +370,7 @@ export default function WorkHistory() {
             <input
               type="date"
               value={filters.dateFrom}
-              onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+              onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
@@ -269,7 +380,7 @@ export default function WorkHistory() {
             <input
               type="date"
               value={filters.dateTo}
-              onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+              onChange={(e) => handleFilterChange('dateTo', e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
             />
           </div>
@@ -278,8 +389,9 @@ export default function WorkHistory() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Zone</label>
             <select
               value={filters.zoneId}
-              onChange={(e) => setFilters(prev => ({ ...prev, zoneId: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              onChange={(e) => handleFilterChange('zoneId', e.target.value)}
+              disabled={!filters.cityId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
             >
               <option value="">All Zones</option>
               {availableZones.map(zone => (
@@ -292,8 +404,9 @@ export default function WorkHistory() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Ward</label>
             <select
               value={filters.wardId}
-              onChange={(e) => setFilters(prev => ({ ...prev, wardId: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              onChange={(e) => handleFilterChange('wardId', e.target.value)}
+              disabled={!filters.zoneId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
             >
               <option value="">All Wards</option>
               {availableWards.map(ward => (
@@ -306,8 +419,9 @@ export default function WorkHistory() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
             <select
               value={filters.locationId}
-              onChange={(e) => setFilters(prev => ({ ...prev, locationId: e.target.value }))}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              onChange={(e) => handleFilterChange('locationId', e.target.value)}
+              disabled={!filters.wardId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
             >
               <option value="">All Locations</option>
               {availableLocations.map(location => (
@@ -315,11 +429,59 @@ export default function WorkHistory() {
               ))}
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Engineer</label>
+            <select
+              value={filters.engineerId}
+              onChange={(e) => handleFilterChange('engineerId', e.target.value)}
+              disabled={!filters.cityId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="">All Engineers</option>
+              {availableEngineers.map(engineer => (
+                <option key={engineer.id} value={engineer.id}>{engineer.name}</option>
+              ))}
+            </select>
+            {!filters.cityId && (
+              <p className="mt-1 text-xs text-gray-500">Select a city first</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Executive Engineer</label>
+            <select
+              value={filters.executiveEngineerId}
+              onChange={(e) => handleFilterChange('executiveEngineerId', e.target.value)}
+              disabled={!filters.cityId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+            >
+              <option value="">All Exec. Engineers</option>
+              {availableExecutiveEngineers.map(execEngineer => (
+                <option key={execEngineer.id} value={execEngineer.id}>{execEngineer.name}</option>
+              ))}
+            </select>
+            {!filters.cityId && (
+              <p className="mt-1 text-xs text-gray-500">Select a city first</p>
+            )}
+          </div>
         </div>
 
-        {(filters.cityId || filters.dateFrom || filters.dateTo || filters.zoneId || filters.wardId || filters.locationId) && (
+        {(filters.cityId || filters.dateFrom || filters.dateTo || filters.zoneId || filters.wardId || filters.locationId || filters.engineerId || filters.executiveEngineerId) && (
           <button
-            onClick={() => setFilters({ cityId: '', dateFrom: '', dateTo: '', zoneId: '', wardId: '', locationId: '' })}
+            onClick={() => {
+              const cityId = (user?.role !== 'admin' && user?.city_id) ? user.city_id : '';
+              setFilters({
+                cityId,
+                dateFrom: '',
+                dateTo: '',
+                zoneId: '',
+                wardId: '',
+                locationId: '',
+                engineerId: '',
+                executiveEngineerId: ''
+              });
+            }}
             className="mt-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
           >
             <X className="w-4 h-4" />
@@ -372,8 +534,18 @@ export default function WorkHistory() {
               ) : (
                 filteredEntries.map(entry => {
                   const hours = (entry.chmr - entry.shmr).toFixed(1);
-                  const hasMedia = entry.image_url || entry.video_url;
-                  const mediaCount = (entry.image_url ? 1 : 0) + (entry.video_url ? 1 : 0);
+
+                  // Count media from new table, fallback to old columns
+                  const entryWithMedia = entry as any;
+                  const photoCount = entryWithMedia.media
+                    ? entryWithMedia.media.filter((m: any) => m.media_type === 'photo').length
+                    : (entry.image_url ? 1 : 0);
+
+                  const videoCount = entryWithMedia.media
+                    ? entryWithMedia.media.filter((m: any) => m.media_type === 'video').length
+                    : (entry.video_url ? 1 : 0);
+
+                  const hasMedia = photoCount > 0 || videoCount > 0;
 
                   return (
                     <tr
@@ -392,9 +564,9 @@ export default function WorkHistory() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {hasMedia ? (
                           <span>
-                            {entry.image_url && `${mediaCount > 1 ? '1' : '1'} photo${mediaCount > 1 ? 's' : ''}`}
-                            {entry.image_url && entry.video_url && ' + '}
-                            {entry.video_url && `${mediaCount > 1 && entry.image_url ? '1' : '1'} video${mediaCount > 1 && entry.image_url ? 's' : ''}`}
+                            {photoCount > 0 && `${photoCount} photo${photoCount > 1 ? 's' : ''}`}
+                            {photoCount > 0 && videoCount > 0 && ' + '}
+                            {videoCount > 0 && `${videoCount} video${videoCount > 1 ? 's' : ''}`}
                           </span>
                         ) : (
                           <span className="text-gray-400">None</span>

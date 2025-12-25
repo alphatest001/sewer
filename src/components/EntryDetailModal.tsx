@@ -1,5 +1,6 @@
 import { X, Download } from 'lucide-react';
 import { useState } from 'react';
+import MediaGallery from './MediaGallery';
 
 interface EntryDetailModalProps {
   entry: any;
@@ -102,44 +103,67 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
                 )}
               </div>
 
-              {entry.image_url && (
+              {/* Photos Section */}
+              {entry.media && entry.media.some((m: any) => m.media_type === 'photo') && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Photo</h3>
-                  <div className="space-y-2">
-                    <img
-                      src={entry.image_url}
-                      alt="Work site"
-                      onClick={() => setSelectedPhoto(entry.image_url)}
-                      className="w-full max-w-md h-64 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
-                    />
-                  </div>
+                  <MediaGallery
+                    media={entry.media}
+                    type="photo"
+                    title="Photos"
+                  />
                 </div>
               )}
 
-              {entry.video_url && (
+              {/* Videos Section */}
+              {entry.media && entry.media.some((m: any) => m.media_type === 'video') && (
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">Video</h3>
-                    <a
-                      href={entry.video_url}
-                      download
-                      className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download
-                    </a>
-                  </div>
-                  <video
-                    controls
-                    className="w-full max-w-2xl rounded-lg border border-gray-200"
-                    preload="metadata"
-                  >
-                    <source src={entry.video_url} type="video/mp4" />
-                    <source src={entry.video_url} type="video/webm" />
-                    <source src={entry.video_url} type="video/ogg" />
-                    Your browser does not support the video player. Please use the download button above.
-                  </video>
+                  <MediaGallery
+                    media={entry.media}
+                    type="video"
+                    title="Videos"
+                  />
                 </div>
+              )}
+
+              {/* Backward Compatibility Fallback */}
+              {(!entry.media || entry.media.length === 0) && (
+                <>
+                  {entry.image_url && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3">Photo</h3>
+                      <img
+                        src={entry.image_url}
+                        alt="Work site"
+                        onClick={() => setSelectedPhoto(entry.image_url)}
+                        className="w-full max-w-md h-64 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                      />
+                    </div>
+                  )}
+
+                  {entry.video_url && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold text-gray-900">Video</h3>
+                        <a
+                          href={entry.video_url}
+                          download
+                          className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </a>
+                      </div>
+                      <video
+                        controls
+                        className="w-full max-w-2xl rounded-lg border border-gray-200"
+                        preload="metadata"
+                      >
+                        <source src={entry.video_url} type="video/mp4" />
+                        Your browser does not support the video player.
+                      </video>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

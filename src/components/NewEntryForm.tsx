@@ -138,6 +138,16 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
     }
   }, [formData.cityId, engineers, executiveEngineers]);
 
+  // Auto-calculate hours from CHMR - SHMR
+  useEffect(() => {
+    const calculatedHours = formData.chmr - formData.shmr;
+    const roundedHours = calculatedHours > 0 ? parseFloat(calculatedHours.toFixed(1)) : 0;
+
+    if (roundedHours !== formData.hours) {
+      setFormData(prev => ({ ...prev, hours: roundedHours }));
+    }
+  }, [formData.shmr, formData.chmr]);
+
   const fetchMasterData = async () => {
     try {
       const [citiesRes, zonesRes, wardsRes, locationsRes, engineersRes, execEngineersRes] = await Promise.all([
@@ -280,14 +290,19 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
       return;
     }
 
-    if (formData.shmr <= 0 || formData.chmr <= 0 || formData.hours <= 0) {
-      alert('SHMR, CHMR, and No. of Hours must be greater than 0.');
+    if (formData.shmr <= 0 || formData.chmr <= 0) {
+      alert('SHMR and CHMR must be greater than 0.');
+      return;
+    }
+
+    if (formData.chmr <= formData.shmr) {
+      alert('CHMR (Closing Hour Meter Reading) must be greater than SHMR (Start Hour Meter Reading).');
       return;
     }
 
     setSaving(true);
     try {
-      // Prepare work entry data
+      // Step 1: Insert work entry and get the returned ID
       const workEntry = {
         customer_id: null,
         customer_name: '',  // Empty since we removed customer fields
@@ -308,11 +323,59 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
         created_by: user?.id || null
       };
 
-      const { error } = await supabase
+      const { data: insertedEntry, error: entryError } = await supabase
         .from('work_entries')
-        .insert([workEntry]);
+        .insert([workEntry])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (entryError) throw entryError;
+
+      // Step 2: Insert all media items into work_entry_media table
+      const mediaItems: Array<{
+        work_entry_id: string;
+        media_type: 'photo' | 'video';
+        media_url: string;
+        file_name: string;
+        file_size: number;
+        display_order: number;
+      }> = [];
+
+      // Add all photos
+      photos.forEach((photo, index) => {
+        mediaItems.push({
+          work_entry_id: insertedEntry.id,
+          media_type: 'photo',
+          media_url: photo.url,
+          file_name: photo.file.name,
+          file_size: photo.file.size,
+          display_order: index
+        });
+      });
+
+      // Add all videos (start order after photos)
+      videos.forEach((video, index) => {
+        mediaItems.push({
+          work_entry_id: insertedEntry.id,
+          media_type: 'video',
+          media_url: video.url,
+          file_name: video.file.name,
+          file_size: video.file.size,
+          display_order: photos.length + index
+        });
+      });
+
+      // Bulk insert media if any exist
+      if (mediaItems.length > 0) {
+        const { error: mediaError } = await supabase
+          .from('work_entry_media')
+          .insert(mediaItems);
+
+        if (mediaError) {
+          console.error('Error saving media:', mediaError);
+          alert('Work entry saved, but some media failed to upload. Please try re-adding media.');
+        }
+      }
 
       alert('Work entry saved successfully!');
       handleClear();
@@ -490,11 +553,13 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
           <div>
             <NumericInput
               value={formData.hours}
-              onChange={(value) => setFormData(prev => ({ ...prev, hours: value }))}
-              label="No. of Hours"
+              onChange={(value) => {}}
+              label="No. of Hours (Auto-calculated)"
               min={0.1}
               max={10000}
               step={0.1}
+              disabled={true}
+              hideButtons={true}
               required
             />
           </div>

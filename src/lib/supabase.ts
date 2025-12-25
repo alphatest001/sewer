@@ -62,6 +62,18 @@ export interface EngineerCityMapping {
   created_at: string;
 }
 
+export interface WorkEntryMedia {
+  id: string;
+  work_entry_id: string;
+  media_type: 'photo' | 'video';
+  media_url: string;
+  file_name: string | null;
+  file_size: number | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkEntry {
   id: string;
   customer_id: string | null;
@@ -81,4 +93,5 @@ export interface WorkEntry {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  media?: WorkEntryMedia[];
 }
