@@ -78,9 +78,11 @@ function AppContent() {
   // Everyone can see work history (filtered by role)
   menuItems.push({ id: 'history' as Tab, label: 'Work History', icon: History });
 
-  // Only admin can see admin panel
+  // Admin, Engineer, and Executive Engineer can see admin panel
   if (user.role === 'admin') {
     menuItems.push({ id: 'admin' as Tab, label: 'Admin Panel', icon: Settings });
+  } else if (user.role === 'engineer' || user.role === 'executive_engineer') {
+    menuItems.push({ id: 'admin' as Tab, label: 'Manage Locations', icon: Settings });
   }
 
   // Role badge color
@@ -197,7 +199,7 @@ function AppContent() {
           <NewEntryForm onSave={handleSaveEntry} />
         )}
         {activeTab === 'history' && <WorkHistory />}
-        {activeTab === 'admin' && user.role === 'admin' && <AdminPanel />}
+        {activeTab === 'admin' && (user.role === 'admin' || user.role === 'engineer' || user.role === 'executive_engineer') && <AdminPanel />}
       </main>
 
       {toastMessage && (

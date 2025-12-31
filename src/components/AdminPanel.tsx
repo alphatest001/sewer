@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Users, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import ConfirmDialog from './ConfirmDialog';
 import UserCredentialsModal from './UserCredentialsModal';
 import ErrorModal from './ErrorModal';
@@ -42,6 +43,12 @@ interface User {
 }
 
 export default function AdminPanel() {
+  const { user: currentUser } = useAuth();
+
+  // Role checks - must be defined before useEffects
+  const isAdmin = currentUser?.role === 'admin';
+  const isEngineerOrExec = currentUser?.role === 'engineer' || currentUser?.role === 'executive_engineer';
+
   const [activeTab, setActiveTab] = useState<TabType>('cities');
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -95,6 +102,27 @@ export default function AdminPanel() {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  // Set default tab for non-admin users
+  useEffect(() => {
+    if (currentUser && !isAdmin && isEngineerOrExec) {
+      setActiveTab('wards');
+    }
+  }, [currentUser, isAdmin, isEngineerOrExec]);
+
+  // Auto-select city for engineers in wards tab
+  useEffect(() => {
+    if (isEngineerOrExec && currentUser?.city_id && activeTab === 'wards') {
+      setNewWard(prev => ({ ...prev, cityId: currentUser.city_id || '' }));
+    }
+  }, [isEngineerOrExec, currentUser?.city_id, activeTab]);
+
+  // Auto-select city for engineers in locations tab
+  useEffect(() => {
+    if (isEngineerOrExec && currentUser?.city_id && activeTab === 'locations') {
+      setNewLocation(prev => ({ ...prev, cityId: currentUser.city_id || '' }));
+    }
+  }, [isEngineerOrExec, currentUser?.city_id, activeTab]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -238,12 +266,29 @@ export default function AdminPanel() {
   const handleAddWard = async () => {
     if (!newWard.name.trim() || !newWard.zoneId) return;
 
+    // Additional validation for engineers
+    if (isEngineerOrExec && currentUser?.city_id) {
+      const zone = zones.find(z => z.id === newWard.zoneId);
+      if (!zone || zone.city_id !== currentUser.city_id) {
+        alert('You can only create wards in zones within your assigned city.');
+        return;
+      }
+    }
+
     try {
       const { error } = await supabase
         .from('wards')
         .insert([{ name: newWard.name.trim(), zone_id: newWard.zoneId }]);
 
-      if (error) throw error;
+      if (error) {
+        // Check for RLS policy violation
+        if (error.message.includes('policy') || error.message.includes('permission')) {
+          alert('Permission denied. You can only create wards in your assigned city.');
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       setNewWard({ name: '', cityId: '', zoneId: '' });
       fetchAllData();
@@ -262,12 +307,31 @@ export default function AdminPanel() {
   const handleAddLocation = async () => {
     if (!newLocation.name.trim() || !newLocation.wardId) return;
 
+    // Additional validation for engineers
+    if (isEngineerOrExec && currentUser?.city_id) {
+      const ward = wards.find(w => w.id === newLocation.wardId);
+      if (!ward) return;
+      const zone = zones.find(z => z.id === ward.zone_id);
+      if (!zone || zone.city_id !== currentUser.city_id) {
+        alert('You can only create locations in wards within your assigned city.');
+        return;
+      }
+    }
+
     try {
       const { error } = await supabase
         .from('locations')
         .insert([{ name: newLocation.name.trim(), ward_id: newLocation.wardId }]);
 
-      if (error) throw error;
+      if (error) {
+        // Check for RLS policy violation
+        if (error.message.includes('policy') || error.message.includes('permission')) {
+          alert('Permission denied. You can only create locations in your assigned city.');
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       setNewLocation({ name: '', cityId: '', zoneId: '', wardId: '' });
       fetchAllData();
@@ -424,6 +488,15 @@ export default function AdminPanel() {
     return wards.find(w => w.id === wardId)?.name || 'Unknown';
   };
 
+  // Early return if user not loaded
+  if (!currentUser) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -435,25 +508,36 @@ export default function AdminPanel() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-6">Admin Panel - Master Data Management</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+          {isAdmin ? 'Admin Panel - Master Data Management' : 'Location Management'}
+        </h2>
 
         <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          <button
-            onClick={() => setActiveTab('cities')}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              activeTab === 'cities' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Cities
-          </button>
-          <button
-            onClick={() => setActiveTab('zones')}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              activeTab === 'zones' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Zones
-          </button>
+          {/* Cities Tab - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('cities')}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                activeTab === 'cities' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Cities
+            </button>
+          )}
+
+          {/* Zones Tab - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('zones')}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                activeTab === 'zones' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Zones
+            </button>
+          )}
+
+          {/* Wards Tab - Everyone */}
           <button
             onClick={() => setActiveTab('wards')}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
@@ -462,6 +546,8 @@ export default function AdminPanel() {
           >
             Wards
           </button>
+
+          {/* Locations Tab - Everyone */}
           <button
             onClick={() => setActiveTab('locations')}
             className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
@@ -470,31 +556,43 @@ export default function AdminPanel() {
           >
             Locations
           </button>
-          <button
-            onClick={() => setActiveTab('engineers')}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              activeTab === 'engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Engineers
-          </button>
-          <button
-            onClick={() => setActiveTab('executive_engineers')}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-              activeTab === 'executive_engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Executive Engineers
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors flex items-center gap-2 ${
-              activeTab === 'users' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            User Accounts
-          </button>
+
+          {/* Engineers Tab - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('engineers')}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                activeTab === 'engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Engineers
+            </button>
+          )}
+
+          {/* Executive Engineers Tab - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('executive_engineers')}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+                activeTab === 'executive_engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Executive Engineers
+            </button>
+          )}
+
+          {/* User Accounts Tab - Admin only */}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors flex items-center gap-2 ${
+                activeTab === 'users' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              User Accounts
+            </button>
+          )}
         </div>
 
         {/* Cities Tab */}
@@ -595,83 +693,114 @@ export default function AdminPanel() {
         {/* Wards Tab */}
         {activeTab === 'wards' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-2">
-              <select
-                value={newWard.cityId}
-                onChange={(e) => setNewWard({ ...newWard, cityId: e.target.value, zoneId: '' })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              >
-                <option value="">Select City</option>
-                {cities.map(city => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </select>
-              <select
-                value={newWard.zoneId}
-                onChange={(e) => setNewWard({ ...newWard, zoneId: e.target.value })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                disabled={!newWard.cityId}
-              >
-                <option value="">Select Zone</option>
-                {zones
-                  .filter(zone => !newWard.cityId || zone.city_id === newWard.cityId)
-                  .map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.name}</option>
-                  ))}
-              </select>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newWard.name}
-                  onChange={(e) => setNewWard({ ...newWard, name: e.target.value })}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddWard()}
-                  placeholder="Ward name..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-                <button
-                  onClick={handleAddWard}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
+            {/* Info banner for engineers */}
+            {isEngineerOrExec && currentUser?.city_id && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  You can create new wards in zones within your assigned city: <strong>{cities.find(c => c.id === currentUser.city_id)?.name || 'Unknown'}</strong>
+                </p>
               </div>
-            </div>
+            )}
+
+            {/* Warning for engineers without city */}
+            {isEngineerOrExec && !currentUser?.city_id && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 font-semibold">
+                  No city assigned. Please contact your administrator to assign you to a city before creating wards.
+                </p>
+              </div>
+            )}
+
+            {/* Only show form if admin OR (engineer with city assigned) */}
+            {(isAdmin || (isEngineerOrExec && currentUser?.city_id)) && (
+              <div className="grid grid-cols-3 gap-2">
+                <select
+                  value={newWard.cityId}
+                  onChange={(e) => setNewWard({ ...newWard, cityId: e.target.value, zoneId: '' })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  disabled={isEngineerOrExec}
+                >
+                  <option value="">Select City</option>
+                  {cities
+                    .filter(city => isAdmin || city.id === currentUser?.city_id)
+                    .map(city => (
+                      <option key={city.id} value={city.id}>{city.name}</option>
+                    ))}
+                </select>
+                <select
+                  value={newWard.zoneId}
+                  onChange={(e) => setNewWard({ ...newWard, zoneId: e.target.value })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  disabled={!newWard.cityId}
+                >
+                  <option value="">Select Zone</option>
+                  {zones
+                    .filter(zone => !newWard.cityId || zone.city_id === newWard.cityId)
+                    .map(zone => (
+                      <option key={zone.id} value={zone.id}>{zone.name}</option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newWard.name}
+                    onChange={(e) => setNewWard({ ...newWard, name: e.target.value })}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddWard()}
+                    placeholder="Ward name..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleAddWard}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Ward display list */}
             <div className="space-y-4">
-              {cities.map(city => {
-                const cityZones = zones.filter(z => z.city_id === city.id);
-                if (cityZones.length === 0) return null;
+              {cities
+                .filter(city => isAdmin || city.id === currentUser?.city_id)
+                .map(city => {
+                  const cityZones = zones.filter(z => z.city_id === city.id);
+                  if (cityZones.length === 0) return null;
 
-                return (
-                  <div key={city.id} className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">{city.name}</h4>
-                    <div className="space-y-3">
-                      {cityZones.map(zone => {
-                        const zoneWards = wards.filter(w => w.zone_id === zone.id);
-                        if (zoneWards.length === 0) return null;
+                  return (
+                    <div key={city.id} className="border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-gray-900 mb-3">{city.name}</h4>
+                      <div className="space-y-3">
+                        {cityZones.map(zone => {
+                          const zoneWards = wards.filter(w => w.zone_id === zone.id);
+                          if (zoneWards.length === 0) return null;
 
-                        return (
-                          <div key={zone.id} className="pl-4 border-l-2 border-gray-300">
-                            <h5 className="font-medium text-gray-700 mb-2">{zone.name}</h5>
-                            <div className="space-y-2">
-                              {zoneWards.map(ward => (
-                                <div key={ward.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                  <span className="text-gray-600">{ward.name}</span>
-                                  <button
-                                    onClick={() => handleDeleteWard(ward.id, ward.name)}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              ))}
+                          return (
+                            <div key={zone.id} className="pl-4 border-l-2 border-gray-300">
+                              <h5 className="font-medium text-gray-700 mb-2">{zone.name}</h5>
+                              <div className="space-y-2">
+                                {zoneWards.map(ward => (
+                                  <div key={ward.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                    <span className="text-gray-600">{ward.name}</span>
+                                    {/* Only show delete button for admins */}
+                                    {isAdmin && (
+                                      <button
+                                        onClick={() => handleDeleteWard(ward.id, ward.name)}
+                                        className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         )}
@@ -679,75 +808,116 @@ export default function AdminPanel() {
         {/* Locations Tab */}
         {activeTab === 'locations' && (
           <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-2">
-              <select
-                value={newLocation.cityId}
-                onChange={(e) => setNewLocation({ ...newLocation, cityId: e.target.value, zoneId: '', wardId: '' })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              >
-                <option value="">Select City</option>
-                {cities.map(city => (
-                  <option key={city.id} value={city.id}>{city.name}</option>
-                ))}
-              </select>
-              <select
-                value={newLocation.zoneId}
-                onChange={(e) => setNewLocation({ ...newLocation, zoneId: e.target.value, wardId: '' })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                disabled={!newLocation.cityId}
-              >
-                <option value="">Select Zone</option>
-                {zones
-                  .filter(zone => !newLocation.cityId || zone.city_id === newLocation.cityId)
-                  .map(zone => (
-                    <option key={zone.id} value={zone.id}>{zone.name}</option>
-                  ))}
-              </select>
-              <select
-                value={newLocation.wardId}
-                onChange={(e) => setNewLocation({ ...newLocation, wardId: e.target.value })}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                disabled={!newLocation.zoneId}
-              >
-                <option value="">Select Ward</option>
-                {wards
-                  .filter(ward => !newLocation.zoneId || ward.zone_id === newLocation.zoneId)
-                  .map(ward => (
-                    <option key={ward.id} value={ward.id}>{ward.name}</option>
-                  ))}
-              </select>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newLocation.name}
-                  onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddLocation()}
-                  placeholder="Location name..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-                <button
-                  onClick={handleAddLocation}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
+            {/* Info banner for engineers */}
+            {isEngineerOrExec && currentUser?.city_id && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800">
+                  You can create new locations in wards within your assigned city: <strong>{cities.find(c => c.id === currentUser.city_id)?.name || 'Unknown'}</strong>
+                </p>
               </div>
-            </div>
-            <div className="space-y-2">
-              {locations.map(location => (
-                <div key={location.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <span className="text-gray-900 font-medium">{location.name}</span>
-                    <span className="text-sm text-gray-500 ml-2">({getWardName(location.ward_id)})</span>
-                  </div>
+            )}
+
+            {/* Warning for engineers without city */}
+            {isEngineerOrExec && !currentUser?.city_id && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800 font-semibold">
+                  No city assigned. Please contact your administrator to assign you to a city before creating locations.
+                </p>
+              </div>
+            )}
+
+            {/* Only show form if admin OR (engineer with city assigned) */}
+            {(isAdmin || (isEngineerOrExec && currentUser?.city_id)) && (
+              <div className="grid grid-cols-4 gap-2">
+                <select
+                  value={newLocation.cityId}
+                  onChange={(e) => setNewLocation({ ...newLocation, cityId: e.target.value, zoneId: '', wardId: '' })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  disabled={isEngineerOrExec}
+                >
+                  <option value="">Select City</option>
+                  {cities
+                    .filter(city => isAdmin || city.id === currentUser?.city_id)
+                    .map(city => (
+                      <option key={city.id} value={city.id}>{city.name}</option>
+                    ))}
+                </select>
+                <select
+                  value={newLocation.zoneId}
+                  onChange={(e) => setNewLocation({ ...newLocation, zoneId: e.target.value, wardId: '' })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  disabled={!newLocation.cityId}
+                >
+                  <option value="">Select Zone</option>
+                  {zones
+                    .filter(zone => !newLocation.cityId || zone.city_id === newLocation.cityId)
+                    .map(zone => (
+                      <option key={zone.id} value={zone.id}>{zone.name}</option>
+                    ))}
+                </select>
+                <select
+                  value={newLocation.wardId}
+                  onChange={(e) => setNewLocation({ ...newLocation, wardId: e.target.value })}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  disabled={!newLocation.zoneId}
+                >
+                  <option value="">Select Ward</option>
+                  {wards
+                    .filter(ward => !newLocation.zoneId || ward.zone_id === newLocation.zoneId)
+                    .map(ward => (
+                      <option key={ward.id} value={ward.id}>{ward.name}</option>
+                    ))}
+                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newLocation.name}
+                    onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddLocation()}
+                    placeholder="Location name..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  />
                   <button
-                    onClick={() => handleDeleteLocation(location.id, location.name)}
-                    className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                    onClick={handleAddLocation}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Location display list */}
+            <div className="space-y-2">
+              {locations
+                .filter(location => {
+                  // For non-admins, only show locations in their city
+                  if (!isAdmin && currentUser?.city_id) {
+                    const ward = wards.find(w => w.id === location.ward_id);
+                    if (!ward) return false;
+                    const zone = zones.find(z => z.id === ward.zone_id);
+                    if (!zone) return false;
+                    return zone.city_id === currentUser.city_id;
+                  }
+                  return true;
+                })
+                .map(location => (
+                  <div key={location.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="text-gray-900 font-medium">{location.name}</span>
+                      <span className="text-sm text-gray-500 ml-2">({getWardName(location.ward_id)})</span>
+                    </div>
+                    {/* Only show delete button for admins */}
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteLocation(location.id, location.name)}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
             </div>
           </div>
         )}
