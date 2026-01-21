@@ -86,13 +86,8 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Engineer</label>
-                  <p className="text-gray-900">{entry.engineer.full_name}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">Executive Engineer</label>
-                  <p className="text-gray-900">{entry.executive_engineer?.full_name || 'N/A'}</p>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Supervisor</label>
+                  <p className="text-gray-900">{entry.supervisor.full_name}</p>
                 </div>
 
                 {entry.remark && (

@@ -27,8 +27,7 @@ export const masterData: MasterData = {
     'PARK STREET',
     'LAKE VIEW ROAD'
   ],
-  engineers: ['BHARATHI', 'ABIMANINU', 'KUMAR', 'SHANKAR', 'VIJAY'],
-  executiveEngineers: ['INDHRA', 'RAJESH', 'VENKAT', 'PRIYA', 'SURESH']
+  supervisors: ['BHARATHI', 'ABIMANINU', 'KUMAR', 'SHANKAR', 'VIJAY']
 };
 
 export const dummyEntries: WorkEntry[] = [
@@ -45,8 +44,7 @@ export const dummyEntries: WorkEntry[] = [
     shmr: 353.4,
     chmr: 361.8,
     noOfHrs: 8.4,
-    assistantEngineer: 'BHARATHI',
-    assistantExecutiveEngineer: 'INDHRA',
+    supervisor: 'BHARATHI',
     remarks: 'Jetting done, no blockage observed.',
     photos: [
       { id: 'p1', name: 'work-site-1.jpg', url: 'https://images.pexels.com/photos/1128408/pexels-photo-1128408.jpeg?auto=compress&cs=tinysrgb&w=400', caption: 'Work site overview' },
@@ -69,8 +67,7 @@ export const dummyEntries: WorkEntry[] = [
     shmr: 361.8,
     chmr: 370.2,
     noOfHrs: 8.4,
-    assistantEngineer: 'ABIMANINU',
-    assistantExecutiveEngineer: 'RAJESH',
+    supervisor: 'ABIMANINU',
     remarks: 'Excavation completed, area cleared.',
     photos: [
       { id: 'p3', name: 'excavation-1.jpg', url: 'https://images.pexels.com/photos/1108101/pexels-photo-1108101.jpeg?auto=compress&cs=tinysrgb&w=400', caption: 'Excavation site' },
@@ -94,8 +91,7 @@ export const dummyEntries: WorkEntry[] = [
     shmr: 370.2,
     chmr: 377.8,
     noOfHrs: 7.6,
-    assistantEngineer: 'BHARATHI',
-    assistantExecutiveEngineer: 'INDHRA',
+    supervisor: 'BHARATHI',
     remarks: 'Sewer line cleaning completed successfully.',
     photos: [
       { id: 'p6', name: 'sewer-before.jpg', url: 'https://images.pexels.com/photos/459653/pexels-photo-459653.jpeg?auto=compress&cs=tinysrgb&w=400', caption: 'Before cleaning' }
@@ -118,8 +114,7 @@ export const dummyEntries: WorkEntry[] = [
     shmr: 344.7,
     chmr: 353.4,
     noOfHrs: 8.7,
-    assistantEngineer: 'ABIMANINU',
-    assistantExecutiveEngineer: 'RAJESH',
+    supervisor: 'ABIMANINU',
     remarks: 'High pressure jetting, drain flow restored.',
     photos: [
       { id: 'p7', name: 'drain-work.jpg', url: 'https://images.pexels.com/photos/585419/pexels-photo-585419.jpeg?auto=compress&cs=tinysrgb&w=400', caption: 'Drain maintenance' },

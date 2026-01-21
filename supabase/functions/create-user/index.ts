@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface CreateUserRequest {
   fullName: string;
-  role: 'engineer' | 'executive_engineer' | 'customer';
+  role: 'supervisor' | 'customer';
   cityId: string;
 }
 
@@ -26,11 +26,8 @@ function generatePassword(length: number = 8): string {
 async function generateUserId(supabase: any, role: string): Promise<string> {
   let prefix = '';
   switch (role) {
-    case 'engineer':
-      prefix = 'ENG';
-      break;
-    case 'executive_engineer':
-      prefix = 'EXEC';
+    case 'supervisor':
+      prefix = 'SUP';
       break;
     case 'customer':
       prefix = 'CUST';
@@ -133,9 +130,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // Validate role
-    if (body.role !== 'engineer' && body.role !== 'executive_engineer' && body.role !== 'customer') {
+    if (body.role !== 'supervisor' && body.role !== 'customer') {
       return new Response(
-        JSON.stringify({ error: 'Invalid role. Must be engineer, executive_engineer, or customer', success: false }),
+        JSON.stringify({ error: 'Invalid role. Must be supervisor or customer', success: false }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }

@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Database types
-export type UserRole = 'admin' | 'employee' | 'customer' | 'engineer' | 'executive_engineer';
+export type UserRole = 'admin' | 'employee' | 'customer' | 'supervisor';
 
 export interface User {
   id: string;
@@ -49,19 +49,6 @@ export interface Location {
   created_at: string;
 }
 
-export interface Engineer {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-export interface EngineerCityMapping {
-  id: string;
-  engineer_id: string;
-  city_id: string;
-  created_at: string;
-}
-
 export interface WorkEntryMedia {
   id: string;
   work_entry_id: string;
@@ -84,7 +71,7 @@ export interface WorkEntry {
   ward_id: string;
   location_id: string;
   work_date: string;
-  engineer_id: string;
+  supervisor_id: string;
   shmr: number;
   chmr: number;
   remark: string | null;

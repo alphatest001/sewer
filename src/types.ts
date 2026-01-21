@@ -11,8 +11,7 @@ export interface WorkEntry {
   shmr: number;
   chmr: number;
   noOfHrs: number;
-  assistantEngineer: string;
-  assistantExecutiveEngineer: string;
+  supervisor: string;
   remarks: string;
   photos: MediaFile[];
   videos: MediaFile[];
@@ -32,6 +31,5 @@ export interface MasterData {
   zones: { city: string; zones: string[] }[];
   wards: { city: string; zone: string; wards: string[] }[];
   locations: string[];
-  engineers: string[];
-  executiveEngineers: string[];
+  supervisors: string[];
 }

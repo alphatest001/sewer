@@ -32,7 +32,7 @@ interface Location {
   ward_id: string;
 }
 
-interface Engineer {
+interface Supervisor {
   id: string;
   name: string;
   city_id?: string | null;
@@ -56,8 +56,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
     shmr: 0,
     chmr: 0,
     hours: 0,
-    engineerId: '',
-    executiveEngineerId: '',
+    supervisorId: '',
     remarks: ''
   });
 
@@ -66,15 +65,13 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [engineers, setEngineers] = useState<Engineer[]>([]);
-  const [executiveEngineers, setExecutiveEngineers] = useState<Engineer[]>([]);
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
 
   // Available options based on selections
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [availableWards, setAvailableWards] = useState<Ward[]>([]);
   const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
-  const [availableEngineers, setAvailableEngineers] = useState<Engineer[]>([]);
-  const [availableExecutiveEngineers, setAvailableExecutiveEngineers] = useState<Engineer[]>([]);
+  const [availableSupervisors, setAvailableSupervisors] = useState<Supervisor[]>([]);
 
   const [photos, setPhotos] = useState<UploadedFile[]>([]);
   const [videos, setVideos] = useState<UploadedFile[]>([]);
@@ -87,9 +84,9 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
     fetchMasterData();
   }, []);
 
-  // Lock city for engineers and executive engineers
+  // Lock city for supervisors
   useEffect(() => {
-    if (user && (user.role === 'engineer' || user.role === 'executive_engineer') && user.city_id) {
+    if (user && user.role === 'supervisor' && user.city_id) {
       setFormData(prev => ({ ...prev, cityId: user.city_id || '' }));
     }
   }, [user]);
@@ -124,19 +121,15 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
     }
   }, [formData.wardId, locations]);
 
-  // Update available engineers when city changes
+  // Update available supervisors when city changes
   useEffect(() => {
     if (formData.cityId) {
-      const cityEngineers = engineers.filter(e => e.city_id === formData.cityId);
-      setAvailableEngineers(cityEngineers);
-
-      const cityExecEngineers = executiveEngineers.filter(e => e.city_id === formData.cityId);
-      setAvailableExecutiveEngineers(cityExecEngineers);
+      const citySupervisors = supervisors.filter(s => s.city_id === formData.cityId);
+      setAvailableSupervisors(citySupervisors);
     } else {
-      setAvailableEngineers(engineers);
-      setAvailableExecutiveEngineers(executiveEngineers);
+      setAvailableSupervisors(supervisors);
     }
-  }, [formData.cityId, engineers, executiveEngineers]);
+  }, [formData.cityId, supervisors]);
 
   // Auto-calculate hours from CHMR - SHMR
   useEffect(() => {
@@ -150,19 +143,14 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
 
   const fetchMasterData = async () => {
     try {
-      const [citiesRes, zonesRes, wardsRes, locationsRes, engineersRes, execEngineersRes] = await Promise.all([
+      const [citiesRes, zonesRes, wardsRes, locationsRes, supervisorsRes] = await Promise.all([
         supabase.from('cities').select('*').order('name'),
         supabase.from('zones').select('*').order('name'),
         supabase.from('wards').select('*').order('name'),
         supabase.from('locations').select('*').order('name'),
         supabase.from('users')
           .select('id, full_name, city_id')
-          .eq('role', 'engineer')
-          .not('temp_password', 'is', null)  // Only users with login credentials
-          .order('full_name'),
-        supabase.from('users')
-          .select('id, full_name, city_id')
-          .eq('role', 'executive_engineer')
+          .eq('role', 'supervisor')
           .not('temp_password', 'is', null)  // Only users with login credentials
           .order('full_name')
       ]);
@@ -171,13 +159,9 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
       if (zonesRes.data) setZones(zonesRes.data);
       if (wardsRes.data) setWards(wardsRes.data);
       if (locationsRes.data) setLocations(locationsRes.data);
-      if (engineersRes.data) {
-        // Map to Engineer interface format with city_id
-        setEngineers(engineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
-      }
-      if (execEngineersRes.data) {
-        // Map to Engineer interface format with city_id
-        setExecutiveEngineers(execEngineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
+      if (supervisorsRes.data) {
+        // Map to Supervisor interface format with city_id
+        setSupervisors(supervisorsRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
       }
     } catch (error) {
       console.error('Error fetching master data:', error);
@@ -285,7 +269,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
     e.preventDefault();
 
     if (!formData.cityId || !formData.date || !formData.zoneId || !formData.wardId ||
-        !formData.locationId || !formData.shmr || !formData.chmr || !formData.hours || !formData.engineerId) {
+        !formData.locationId || !formData.shmr || !formData.chmr || !formData.hours || !formData.supervisorId) {
       alert('Please fill in all required fields.');
       return;
     }
@@ -312,8 +296,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
         ward_id: formData.wardId,
         location_id: formData.locationId,
         work_date: formData.date,
-        engineer_id: formData.engineerId,
-        executive_engineer_id: formData.executiveEngineerId || null,
+        supervisor_id: formData.supervisorId,
         shmr: formData.shmr,
         chmr: formData.chmr,
         hours: formData.hours,
@@ -391,8 +374,8 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
   };
 
   const handleClear = () => {
-    // Preserve city lock for engineers/executive engineers
-    const lockedCityId = (user?.role === 'engineer' || user?.role === 'executive_engineer')
+    // Preserve city lock for supervisors
+    const lockedCityId = user?.role === 'supervisor'
       ? user?.city_id || ''
       : '';
 
@@ -405,8 +388,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
       shmr: 0,
       chmr: 0,
       hours: 0,
-      engineerId: '',
-      executiveEngineerId: '',
+      supervisorId: '',
       remarks: ''
     });
     setPhotos([]);
@@ -436,7 +418,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               City <span className="text-red-500">*</span>
-              {user && (user.role === 'engineer' || user.role === 'executive_engineer') && (
+              {user && user.role === 'supervisor' && (
                 <span className="ml-2 text-xs text-blue-600">(Locked to your assigned city)</span>
               )}
             </label>
@@ -444,7 +426,7 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
               name="cityId"
               value={formData.cityId}
               onChange={handleChange}
-              disabled={user?.role === 'engineer' || user?.role === 'executive_engineer'}
+              disabled={user?.role === 'supervisor'}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
               required
             >
@@ -566,40 +548,19 @@ export default function NewEntryForm({ onSave }: NewEntryFormProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Engineer <span className="text-red-500">*</span>
+              Supervisor <span className="text-red-500">*</span>
             </label>
             <select
-              name="engineerId"
-              value={formData.engineerId}
+              name="supervisorId"
+              value={formData.supervisorId}
               onChange={handleChange}
               disabled={!formData.cityId}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
               required
             >
-              <option value="">Select Engineer</option>
-              {availableEngineers.map(engineer => (
-                <option key={engineer.id} value={engineer.id}>{engineer.name}</option>
-              ))}
-            </select>
-            {!formData.cityId && (
-              <p className="mt-1 text-xs text-gray-500">Please select a city first</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Executive Engineer
-            </label>
-            <select
-              name="executiveEngineerId"
-              value={formData.executiveEngineerId}
-              onChange={handleChange}
-              disabled={!formData.cityId}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">Select Executive Engineer</option>
-              {availableExecutiveEngineers.map(execEngineer => (
-                <option key={execEngineer.id} value={execEngineer.id}>{execEngineer.name}</option>
+              <option value="">Select Supervisor</option>
+              {availableSupervisors.map(supervisor => (
+                <option key={supervisor.id} value={supervisor.id}>{supervisor.name}</option>
               ))}
             </select>
             {!formData.cityId && (

@@ -6,7 +6,7 @@ import ConfirmDialog from './ConfirmDialog';
 import UserCredentialsModal from './UserCredentialsModal';
 import ErrorModal from './ErrorModal';
 
-type TabType = 'cities' | 'zones' | 'wards' | 'locations' | 'engineers' | 'executive_engineers' | 'users';
+type TabType = 'cities' | 'zones' | 'wards' | 'locations' | 'supervisors' | 'users';
 
 interface City {
   id: string;
@@ -36,7 +36,7 @@ interface User {
   id: string;
   email: string;
   full_name: string;
-  role: 'admin' | 'employee' | 'customer' | 'engineer' | 'executive_engineer';
+  role: 'admin' | 'employee' | 'customer' | 'supervisor';
   city_id: string | null;
   temp_password: string | null;
   cities?: { name: string };
@@ -47,7 +47,7 @@ export default function AdminPanel() {
 
   // Role checks - must be defined before useEffects
   const isAdmin = currentUser?.role === 'admin';
-  const isEngineerOrExec = currentUser?.role === 'engineer' || currentUser?.role === 'executive_engineer';
+  const isSupervisor = currentUser?.role === 'supervisor';
 
   const [activeTab, setActiveTab] = useState<TabType>('cities');
   const [loading, setLoading] = useState(false);
@@ -77,7 +77,7 @@ export default function AdminPanel() {
   const [newLocation, setNewLocation] = useState({ name: '', cityId: '', zoneId: '', wardId: '' });
   const [newUser, setNewUser] = useState({
     fullName: '',
-    role: 'engineer' as 'engineer' | 'executive_engineer' | 'customer',
+    role: 'supervisor' as 'supervisor' | 'customer',
     cityId: ''
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
@@ -105,24 +105,24 @@ export default function AdminPanel() {
 
   // Set default tab for non-admin users
   useEffect(() => {
-    if (currentUser && !isAdmin && isEngineerOrExec) {
+    if (currentUser && !isAdmin && isSupervisor) {
       setActiveTab('wards');
     }
-  }, [currentUser, isAdmin, isEngineerOrExec]);
+  }, [currentUser, isAdmin, isSupervisor]);
 
-  // Auto-select city for engineers in wards tab
+  // Auto-select city for supervisors in wards tab
   useEffect(() => {
-    if (isEngineerOrExec && currentUser?.city_id && activeTab === 'wards') {
+    if (isSupervisor && currentUser?.city_id && activeTab === 'wards') {
       setNewWard(prev => ({ ...prev, cityId: currentUser.city_id || '' }));
     }
-  }, [isEngineerOrExec, currentUser?.city_id, activeTab]);
+  }, [isSupervisor, currentUser?.city_id, activeTab]);
 
-  // Auto-select city for engineers in locations tab
+  // Auto-select city for supervisors in locations tab
   useEffect(() => {
-    if (isEngineerOrExec && currentUser?.city_id && activeTab === 'locations') {
+    if (isSupervisor && currentUser?.city_id && activeTab === 'locations') {
       setNewLocation(prev => ({ ...prev, cityId: currentUser.city_id || '' }));
     }
-  }, [isEngineerOrExec, currentUser?.city_id, activeTab]);
+  }, [isSupervisor, currentUser?.city_id, activeTab]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -152,7 +152,7 @@ export default function AdminPanel() {
   };
 
   // Generic delete confirmation handlers
-  const promptDelete = (type: 'city' | 'zone' | 'ward' | 'location' | 'engineer' | 'user', id: string, name: string) => {
+  const promptDelete = (type: 'city' | 'zone' | 'ward' | 'location' | 'user', id: string, name: string) => {
     setDeleteConfirm({ isOpen: true, type, id, name });
   };
 
@@ -266,8 +266,8 @@ export default function AdminPanel() {
   const handleAddWard = async () => {
     if (!newWard.name.trim() || !newWard.zoneId) return;
 
-    // Additional validation for engineers
-    if (isEngineerOrExec && currentUser?.city_id) {
+    // Additional validation for supervisors
+    if (isSupervisor && currentUser?.city_id) {
       const zone = zones.find(z => z.id === newWard.zoneId);
       if (!zone || zone.city_id !== currentUser.city_id) {
         alert('You can only create wards in zones within your assigned city.');
@@ -307,8 +307,8 @@ export default function AdminPanel() {
   const handleAddLocation = async () => {
     if (!newLocation.name.trim() || !newLocation.wardId) return;
 
-    // Additional validation for engineers
-    if (isEngineerOrExec && currentUser?.city_id) {
+    // Additional validation for supervisors
+    if (isSupervisor && currentUser?.city_id) {
       const ward = wards.find(w => w.id === newLocation.wardId);
       if (!ward) return;
       const zone = zones.find(z => z.id === ward.zone_id);
@@ -390,7 +390,7 @@ export default function AdminPanel() {
       // Success - reset form and refresh data
       setNewUser({
         fullName: '',
-        role: 'engineer',
+        role: 'supervisor',
         cityId: ''
       });
       await fetchAllData();
@@ -557,27 +557,15 @@ export default function AdminPanel() {
             Locations
           </button>
 
-          {/* Engineers Tab - Admin only */}
+          {/* Supervisors Tab - Admin only */}
           {isAdmin && (
             <button
-              onClick={() => setActiveTab('engineers')}
+              onClick={() => setActiveTab('supervisors')}
               className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                activeTab === 'engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                activeTab === 'supervisors' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
-              Engineers
-            </button>
-          )}
-
-          {/* Executive Engineers Tab - Admin only */}
-          {isAdmin && (
-            <button
-              onClick={() => setActiveTab('executive_engineers')}
-              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                activeTab === 'executive_engineers' ? 'bg-orange-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Executive Engineers
+              Supervisors
             </button>
           )}
 
@@ -693,8 +681,8 @@ export default function AdminPanel() {
         {/* Wards Tab */}
         {activeTab === 'wards' && (
           <div className="space-y-4">
-            {/* Info banner for engineers */}
-            {isEngineerOrExec && currentUser?.city_id && (
+            {/* Info banner for supervisors */}
+            {isSupervisor && currentUser?.city_id && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
                   You can create new wards in zones within your assigned city: <strong>{cities.find(c => c.id === currentUser.city_id)?.name || 'Unknown'}</strong>
@@ -702,8 +690,8 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Warning for engineers without city */}
-            {isEngineerOrExec && !currentUser?.city_id && (
+            {/* Warning for supervisors without city */}
+            {isSupervisor && !currentUser?.city_id && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-sm text-yellow-800 font-semibold">
                   No city assigned. Please contact your administrator to assign you to a city before creating wards.
@@ -711,14 +699,14 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Only show form if admin OR (engineer with city assigned) */}
-            {(isAdmin || (isEngineerOrExec && currentUser?.city_id)) && (
+            {/* Only show form if admin OR (supervisor with city assigned) */}
+            {(isAdmin || (isSupervisor && currentUser?.city_id)) && (
               <div className="grid grid-cols-3 gap-2">
                 <select
                   value={newWard.cityId}
                   onChange={(e) => setNewWard({ ...newWard, cityId: e.target.value, zoneId: '' })}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  disabled={isEngineerOrExec}
+                  disabled={isSupervisor}
                 >
                   <option value="">Select City</option>
                   {cities
@@ -808,8 +796,8 @@ export default function AdminPanel() {
         {/* Locations Tab */}
         {activeTab === 'locations' && (
           <div className="space-y-4">
-            {/* Info banner for engineers */}
-            {isEngineerOrExec && currentUser?.city_id && (
+            {/* Info banner for supervisors */}
+            {isSupervisor && currentUser?.city_id && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
                   You can create new locations in wards within your assigned city: <strong>{cities.find(c => c.id === currentUser.city_id)?.name || 'Unknown'}</strong>
@@ -817,8 +805,8 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Warning for engineers without city */}
-            {isEngineerOrExec && !currentUser?.city_id && (
+            {/* Warning for supervisors without city */}
+            {isSupervisor && !currentUser?.city_id && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-sm text-yellow-800 font-semibold">
                   No city assigned. Please contact your administrator to assign you to a city before creating locations.
@@ -826,14 +814,14 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {/* Only show form if admin OR (engineer with city assigned) */}
-            {(isAdmin || (isEngineerOrExec && currentUser?.city_id)) && (
+            {/* Only show form if admin OR (supervisor with city assigned) */}
+            {(isAdmin || (isSupervisor && currentUser?.city_id)) && (
               <div className="grid grid-cols-4 gap-2">
                 <select
                   value={newLocation.cityId}
                   onChange={(e) => setNewLocation({ ...newLocation, cityId: e.target.value, zoneId: '', wardId: '' })}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  disabled={isEngineerOrExec}
+                  disabled={isSupervisor}
                 >
                   <option value="">Select City</option>
                   {cities
@@ -922,58 +910,29 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Engineers Tab */}
-        {activeTab === 'engineers' && (
+        {/* Supervisors Tab */}
+        {activeTab === 'supervisors' && (
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-800">
-                Engineers are created through the "User Accounts" tab. This tab displays all users with the Engineer role.
+                Supervisors are created through the "User Accounts" tab. This tab displays all users with the Supervisor role.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {users.filter(u => u.role === 'engineer').map(engineer => (
-                <div key={engineer.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+              {users.filter(u => u.role === 'supervisor').map(supervisor => (
+                <div key={supervisor.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <div>
-                    <div className="font-medium text-gray-900">{engineer.full_name}</div>
-                    <div className="text-sm text-gray-600">{engineer.email}</div>
-                    {engineer.cities && (
-                      <div className="text-xs text-gray-500 mt-1">📍 {engineer.cities.name}</div>
+                    <div className="font-medium text-gray-900">{supervisor.full_name}</div>
+                    <div className="text-sm text-gray-600">{supervisor.email}</div>
+                    {supervisor.cities && (
+                      <div className="text-xs text-gray-500 mt-1">📍 {supervisor.cities.name}</div>
                     )}
                   </div>
                 </div>
               ))}
-              {users.filter(u => u.role === 'engineer').length === 0 && (
+              {users.filter(u => u.role === 'supervisor').length === 0 && (
                 <div className="col-span-2 text-center py-8 text-gray-500">
-                  No engineers found. Create engineers from the User Accounts tab.
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Executive Engineers Tab */}
-        {activeTab === 'executive_engineers' && (
-          <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                Executive Engineers are created through the "User Accounts" tab. This tab displays all users with the Executive Engineer role.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {users.filter(u => u.role === 'executive_engineer').map(execEngineer => (
-                <div key={execEngineer.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <div>
-                    <div className="font-medium text-gray-900">{execEngineer.full_name}</div>
-                    <div className="text-sm text-gray-600">{execEngineer.email}</div>
-                    {execEngineer.cities && (
-                      <div className="text-xs text-gray-500 mt-1">📍 {execEngineer.cities.name}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {users.filter(u => u.role === 'executive_engineer').length === 0 && (
-                <div className="col-span-2 text-center py-8 text-gray-500">
-                  No executive engineers found. Create executive engineers from the User Accounts tab.
+                  No supervisors found. Create supervisors from the User Accounts tab.
                 </div>
               )}
             </div>
@@ -995,11 +954,10 @@ export default function AdminPanel() {
                 />
                 <select
                   value={newUser.role}
-                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'engineer' | 'executive_engineer' | 'customer' })}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value as 'supervisor' | 'customer' })}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                 >
-                  <option value="engineer">Engineer</option>
-                  <option value="executive_engineer">Executive Engineer</option>
+                  <option value="supervisor">Supervisor</option>
                   <option value="customer">Customer</option>
                 </select>
                 <select
@@ -1046,11 +1004,10 @@ export default function AdminPanel() {
                         <span className={`px-2 py-1 text-xs font-medium rounded-full capitalize ${
                           user.role === 'admin' ? 'bg-red-100 text-red-700' :
                           user.role === 'employee' ? 'bg-blue-100 text-blue-700' :
-                          user.role === 'engineer' ? 'bg-purple-100 text-purple-700' :
-                          user.role === 'executive_engineer' ? 'bg-indigo-100 text-indigo-700' :
+                          user.role === 'supervisor' ? 'bg-purple-100 text-purple-700' :
                           'bg-green-100 text-green-700'
                         }`}>
-                          {user.role === 'executive_engineer' ? 'Executive Engineer' : user.role}
+                          {user.role}
                         </span>
                       </div>
                       <div className="text-sm text-gray-500 mt-1">

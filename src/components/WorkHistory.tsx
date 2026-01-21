@@ -15,14 +15,12 @@ interface WorkEntry {
   remark: string | null;
   video_url: string | null;
   image_url: string | null;
-  engineer_id: string;
-  executive_engineer_id: string | null;
+  supervisor_id: string;
   city: { name: string };
   zone: { name: string };
   ward: { name: string };
   location: { name: string };
-  engineer: { full_name: string };
-  executive_engineer: { full_name: string } | null;
+  supervisor: { full_name: string };
 }
 
 interface City {
@@ -48,7 +46,7 @@ interface Location {
   ward_id: string;
 }
 
-interface Engineer {
+interface Supervisor {
   id: string;
   name: string;
   city_id: string | null;
@@ -71,16 +69,14 @@ export default function WorkHistory() {
   const [wards, setWards] = useState<Ward[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
-  // Engineer data
-  const [engineers, setEngineers] = useState<Engineer[]>([]);
-  const [executiveEngineers, setExecutiveEngineers] = useState<Engineer[]>([]);
+  // Supervisor data
+  const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
 
   // Available options based on filter selections
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [availableWards, setAvailableWards] = useState<Ward[]>([]);
   const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
-  const [availableEngineers, setAvailableEngineers] = useState<Engineer[]>([]);
-  const [availableExecutiveEngineers, setAvailableExecutiveEngineers] = useState<Engineer[]>([]);
+  const [availableSupervisors, setAvailableSupervisors] = useState<Supervisor[]>([]);
 
   const [filters, setFilters] = useState({
     cityId: '',
@@ -89,8 +85,7 @@ export default function WorkHistory() {
     zoneId: '',
     wardId: '',
     locationId: '',
-    engineerId: '',
-    executiveEngineerId: ''
+    supervisorId: ''
   });
 
   useEffect(() => {
@@ -148,39 +143,32 @@ export default function WorkHistory() {
     }
   }, [filters.cityId, filters.zoneId, filters.wardId, zones, wards, locations]);
 
-  // Cascade: City → Engineers
+  // Cascade: City → Supervisors
   useEffect(() => {
     if (filters.cityId) {
-      const cityEngineers = engineers.filter(e => e.city_id === filters.cityId);
-      setAvailableEngineers(cityEngineers);
-      const cityExecEngineers = executiveEngineers.filter(e => e.city_id === filters.cityId);
-      setAvailableExecutiveEngineers(cityExecEngineers);
+      const citySupervisors = supervisors.filter(s => s.city_id === filters.cityId);
+      setAvailableSupervisors(citySupervisors);
     } else {
-      setAvailableEngineers(engineers);
-      setAvailableExecutiveEngineers(executiveEngineers);
+      setAvailableSupervisors(supervisors);
     }
-  }, [filters.cityId, engineers, executiveEngineers]);
+  }, [filters.cityId, supervisors]);
 
   const fetchMasterData = async () => {
     try {
-      const [citiesRes, zonesRes, wardsRes, locationsRes, engineersRes, execEngineersRes] = await Promise.all([
+      const [citiesRes, zonesRes, wardsRes, locationsRes, supervisorsRes] = await Promise.all([
         supabase.from('cities').select('*').order('name'),
         supabase.from('zones').select('*').order('name'),
         supabase.from('wards').select('*').order('name'),
         supabase.from('locations').select('*').order('name'),
-        supabase.from('users').select('id, full_name, city_id').eq('role', 'engineer').order('full_name'),
-        supabase.from('users').select('id, full_name, city_id').eq('role', 'executive_engineer').order('full_name')
+        supabase.from('users').select('id, full_name, city_id').eq('role', 'supervisor').order('full_name')
       ]);
 
       if (citiesRes.data) setCities(citiesRes.data);
       if (zonesRes.data) setZones(zonesRes.data);
       if (wardsRes.data) setWards(wardsRes.data);
       if (locationsRes.data) setLocations(locationsRes.data);
-      if (engineersRes.data) {
-        setEngineers(engineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
-      }
-      if (execEngineersRes.data) {
-        setExecutiveEngineers(execEngineersRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
+      if (supervisorsRes.data) {
+        setSupervisors(supervisorsRes.data.map(u => ({ id: u.id, name: u.full_name, city_id: u.city_id })));
       }
     } catch (error) {
       console.error('Error fetching master data:', error);
@@ -201,14 +189,13 @@ export default function WorkHistory() {
           zone:zones(name),
           ward:wards(name),
           location:locations(name),
-          engineer:users!work_entries_engineer_id_fkey(full_name),
-          executive_engineer:users!work_entries_executive_engineer_id_fkey(full_name),
+          supervisor:users!work_entries_supervisor_id_fkey(full_name),
           media:work_entry_media(*)
         `)
         .order('work_date', { ascending: false });
 
       // Role-based filtering
-      if (user.role === 'employee' || user.role === 'customer' || user.role === 'engineer' || user.role === 'executive_engineer') {
+      if (user.role === 'employee' || user.role === 'customer' || user.role === 'supervisor') {
         // Filter by user's city
         if (user.city_id) {
           query = query.eq('city_id', user.city_id);
@@ -284,12 +271,8 @@ export default function WorkHistory() {
     if (filters.dateTo && entry.work_date > filters.dateTo) {
       return false;
     }
-    // Engineer filter
-    if (filters.engineerId && entry.engineer_id !== filters.engineerId) {
-      return false;
-    }
-    // Executive Engineer filter
-    if (filters.executiveEngineerId && entry.executive_engineer_id !== filters.executiveEngineerId) {
+    // Supervisor filter
+    if (filters.supervisorId && entry.supervisor_id !== filters.supervisorId) {
       return false;
     }
     return true;
@@ -304,8 +287,7 @@ export default function WorkHistory() {
         updated.zoneId = '';
         updated.wardId = '';
         updated.locationId = '';
-        updated.engineerId = '';
-        updated.executiveEngineerId = '';
+        updated.supervisorId = '';
       }
       if (name === 'zoneId') {
         updated.wardId = '';
@@ -431,34 +413,16 @@ export default function WorkHistory() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Engineer</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Supervisor</label>
             <select
-              value={filters.engineerId}
-              onChange={(e) => handleFilterChange('engineerId', e.target.value)}
+              value={filters.supervisorId}
+              onChange={(e) => handleFilterChange('supervisorId', e.target.value)}
               disabled={!filters.cityId}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
             >
-              <option value="">All Engineers</option>
-              {availableEngineers.map(engineer => (
-                <option key={engineer.id} value={engineer.id}>{engineer.name}</option>
-              ))}
-            </select>
-            {!filters.cityId && (
-              <p className="mt-1 text-xs text-gray-500">Select a city first</p>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Executive Engineer</label>
-            <select
-              value={filters.executiveEngineerId}
-              onChange={(e) => handleFilterChange('executiveEngineerId', e.target.value)}
-              disabled={!filters.cityId}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
-            >
-              <option value="">All Exec. Engineers</option>
-              {availableExecutiveEngineers.map(execEngineer => (
-                <option key={execEngineer.id} value={execEngineer.id}>{execEngineer.name}</option>
+              <option value="">All Supervisors</option>
+              {availableSupervisors.map(supervisor => (
+                <option key={supervisor.id} value={supervisor.id}>{supervisor.name}</option>
               ))}
             </select>
             {!filters.cityId && (
@@ -467,7 +431,7 @@ export default function WorkHistory() {
           </div>
         </div>
 
-        {(filters.cityId || filters.dateFrom || filters.dateTo || filters.zoneId || filters.wardId || filters.locationId || filters.engineerId || filters.executiveEngineerId) && (
+        {(filters.cityId || filters.dateFrom || filters.dateTo || filters.zoneId || filters.wardId || filters.locationId || filters.supervisorId) && (
           <button
             onClick={() => {
               const cityId = (user?.role !== 'admin' && user?.city_id) ? user.city_id : '';
@@ -478,8 +442,7 @@ export default function WorkHistory() {
                 zoneId: '',
                 wardId: '',
                 locationId: '',
-                engineerId: '',
-                executiveEngineerId: ''
+                supervisorId: ''
               });
             }}
             className="mt-4 flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
@@ -516,8 +479,7 @@ export default function WorkHistory() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ward</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EN.</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EXEC EN.</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supervisor</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Media</th>
                 {user?.role === 'admin' && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -527,7 +489,7 @@ export default function WorkHistory() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="px-6 py-12 text-center text-gray-500">
                     No entries found. {user?.role === 'employee' ? 'Create your first work entry!' : 'Adjust your filters or check back later.'}
                   </td>
                 </tr>
@@ -559,8 +521,7 @@ export default function WorkHistory() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.ward.name}</td>
                       <td className="px-6 py-4 text-sm text-gray-900">{entry.location.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{hours}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{entry.engineer.full_name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{entry.executive_engineer?.full_name || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{entry.supervisor.full_name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {hasMedia ? (
                           <span>

@@ -28,8 +28,8 @@ function AppContent() {
       return;
     }
 
-    // Engineers, executive engineers, and employees go to new entry by default
-    if (user.role === 'engineer' || user.role === 'executive_engineer' || user.role === 'employee') {
+    // Supervisors and employees go to new entry by default
+    if (user.role === 'supervisor' || user.role === 'employee') {
       setActiveTab('new-entry');
       return;
     }
@@ -70,18 +70,18 @@ function AppContent() {
   // Determine which menu items to show based on user role
   const menuItems = [];
 
-  // Admin, Employee, Engineer, and Executive Engineer can create new entries
-  if (user.role === 'admin' || user.role === 'employee' || user.role === 'engineer' || user.role === 'executive_engineer') {
+  // Admin, Employee, and Supervisor can create new entries
+  if (user.role === 'admin' || user.role === 'employee' || user.role === 'supervisor') {
     menuItems.push({ id: 'new-entry' as Tab, label: 'New Entry', icon: FileText });
   }
 
   // Everyone can see work history (filtered by role)
   menuItems.push({ id: 'history' as Tab, label: 'Work History', icon: History });
 
-  // Admin, Engineer, and Executive Engineer can see admin panel
+  // Admin and Supervisor can see admin panel
   if (user.role === 'admin') {
     menuItems.push({ id: 'admin' as Tab, label: 'Admin Panel', icon: Settings });
-  } else if (user.role === 'engineer' || user.role === 'executive_engineer') {
+  } else if (user.role === 'supervisor') {
     menuItems.push({ id: 'admin' as Tab, label: 'Manage Locations', icon: Settings });
   }
 
@@ -90,8 +90,7 @@ function AppContent() {
     admin: 'bg-red-100 text-red-700',
     employee: 'bg-blue-100 text-blue-700',
     customer: 'bg-green-100 text-green-700',
-    engineer: 'bg-purple-100 text-purple-700',
-    executive_engineer: 'bg-indigo-100 text-indigo-700',
+    supervisor: 'bg-purple-100 text-purple-700',
   }[user.role];
 
   return (
@@ -195,11 +194,11 @@ function AppContent() {
       )}
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'new-entry' && (user.role === 'admin' || user.role === 'employee' || user.role === 'engineer' || user.role === 'executive_engineer') && (
+        {activeTab === 'new-entry' && (user.role === 'admin' || user.role === 'employee' || user.role === 'supervisor') && (
           <NewEntryForm onSave={handleSaveEntry} />
         )}
         {activeTab === 'history' && <WorkHistory />}
-        {activeTab === 'admin' && (user.role === 'admin' || user.role === 'engineer' || user.role === 'executive_engineer') && <AdminPanel />}
+        {activeTab === 'admin' && (user.role === 'admin' || user.role === 'supervisor') && <AdminPanel />}
       </main>
 
       {toastMessage && (
