@@ -49,7 +49,9 @@ export default function AdminPanel() {
   const isAdmin = currentUser?.role === 'admin';
   const isSupervisor = currentUser?.role === 'supervisor';
 
-  const [activeTab, setActiveTab] = useState<TabType>('cities');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    isSupervisor ? 'wards' : 'cities'
+  );
   const [loading, setLoading] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -103,13 +105,6 @@ export default function AdminPanel() {
     fetchAllData();
   }, []);
 
-  // Set default tab for non-admin users
-  useEffect(() => {
-    if (currentUser && !isAdmin && isSupervisor) {
-      setActiveTab('wards');
-    }
-  }, [currentUser, isAdmin, isSupervisor]);
-
   // Auto-select city for supervisors in wards tab
   useEffect(() => {
     if (isSupervisor && currentUser?.city_id && activeTab === 'wards') {
@@ -123,6 +118,13 @@ export default function AdminPanel() {
       setNewLocation(prev => ({ ...prev, cityId: currentUser.city_id || '' }));
     }
   }, [isSupervisor, currentUser?.city_id, activeTab]);
+
+  // Safety: redirect supervisors away from admin-only tabs
+  useEffect(() => {
+    if (isSupervisor && (activeTab === 'cities' || activeTab === 'zones' || activeTab === 'supervisors' || activeTab === 'users')) {
+      setActiveTab('wards');
+    }
+  }, [activeTab, isSupervisor]);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -583,8 +585,8 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* Cities Tab */}
-        {activeTab === 'cities' && (
+        {/* Cities Tab - Only render if admin */}
+        {activeTab === 'cities' && isAdmin && (
           <div className="space-y-4">
             <div className="flex gap-2">
               <input
@@ -619,8 +621,8 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Zones Tab */}
-        {activeTab === 'zones' && (
+        {/* Zones Tab - Only render if admin */}
+        {activeTab === 'zones' && isAdmin && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
               <select
