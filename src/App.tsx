@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Hammer, Menu, X, FileText, History, Settings, LogOut, User } from 'lucide-react';
+import { Menu, X, FileText, History, Settings, LogOut, User } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './components/Login';
 import NewEntryForm from './components/NewEntryForm';
@@ -109,9 +109,7 @@ function AppContent() {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center">
-              <Hammer className="w-6 h-6 text-white" />
-            </div>
+            <img src="/logo.jpeg" alt="VARMAN Logo" className="h-10 rounded-lg object-contain" />
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-gray-900">VARMAN Equipment Services</h1>
               <p className="text-xs text-gray-500 hidden sm:block">Work Management System</p>
