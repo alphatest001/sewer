@@ -1,21 +1,51 @@
-import { X, Download } from 'lucide-react';
+import { X, Download, Save } from 'lucide-react';
 import { useState } from 'react';
 import MediaGallery from './MediaGallery';
+import { supabase } from '../lib/supabase';
 
 interface EntryDetailModalProps {
   entry: any;
   onClose: () => void;
+  isAdmin?: boolean;
+  onUpdate?: (updated: any) => void;
 }
 
-export default function EntryDetailModal({ entry, onClose }: EntryDetailModalProps) {
+export default function EntryDetailModal({ entry, onClose, isAdmin, onUpdate }: EntryDetailModalProps) {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [shmr, setShmr] = useState<string>(String(entry.shmr));
+  const [chmr, setChmr] = useState<string>(String(entry.chmr));
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-GB');
   };
 
-  const hours = (entry.chmr - entry.shmr).toFixed(1);
+  const parsedShmr = parseFloat(shmr) || 0;
+  const parsedChmr = parseFloat(chmr) || 0;
+  const totalHours = parsedChmr > parsedShmr ? (parsedChmr - parsedShmr).toFixed(1) : '—';
+
+  const hasChanges = isAdmin && (
+    parseFloat(shmr) !== entry.shmr || parseFloat(chmr) !== entry.chmr
+  );
+
+  const handleSave = async () => {
+    const s = parseFloat(shmr);
+    const c = parseFloat(chmr);
+    if (isNaN(s) || s <= 0) { setSaveError('SHMR must be a positive number'); return; }
+    if (isNaN(c) || c <= 0) { setSaveError('CHMR must be a positive number'); return; }
+    if (c <= s) { setSaveError('CHMR must be greater than SHMR'); return; }
+    setIsSaving(true);
+    setSaveError(null);
+    const { error } = await supabase
+      .from('work_entries')
+      .update({ shmr: s, chmr: c })
+      .eq('id', entry.id);
+    setIsSaving(false);
+    if (error) { setSaveError('Failed to save. Please try again.'); return; }
+    onUpdate?.({ ...entry, shmr: s, chmr: c });
+  };
 
   return (
     <>
@@ -25,6 +55,11 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
           <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Work Entry Details</h2>
+              {entry.entry_code && (
+                <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs font-mono font-semibold rounded">
+                  {entry.entry_code}
+                </span>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -72,17 +107,39 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
 
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">SHMR (Start)</label>
-                  <p className="text-gray-900">{entry.shmr}</p>
+                  {isAdmin ? (
+                    <input
+                      type="number"
+                      value={shmr}
+                      onChange={(e) => { setShmr(e.target.value); setSaveError(null); }}
+                      step="0.1"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{entry.shmr}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">CHMR (Close)</label>
-                  <p className="text-gray-900">{entry.chmr}</p>
+                  {isAdmin ? (
+                    <input
+                      type="number"
+                      value={chmr}
+                      onChange={(e) => { setChmr(e.target.value); setSaveError(null); }}
+                      step="0.1"
+                      min="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent text-gray-900"
+                    />
+                  ) : (
+                    <p className="text-gray-900">{entry.chmr}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-500 mb-1">Total Hours</label>
-                  <p className="text-gray-900 font-semibold">{hours}h</p>
+                  <p className="text-gray-900 font-semibold">{totalHours}h</p>
                 </div>
 
                 <div>
@@ -98,7 +155,22 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
                 )}
               </div>
 
-              {/* Photos Section */}
+              {isAdmin && (
+                <div className="flex items-center gap-3">
+                  {saveError && (
+                    <p className="text-sm text-red-600 flex-1">{saveError}</p>
+                  )}
+                  <button
+                    onClick={handleSave}
+                    disabled={!hasChanges || isSaving}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </div>
+              )}
+
               {entry.media && entry.media.some((m: any) => m.media_type === 'photo') && (
                 <div>
                   <MediaGallery
@@ -109,7 +181,6 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
                 </div>
               )}
 
-              {/* Videos Section */}
               {entry.media && entry.media.some((m: any) => m.media_type === 'video') && (
                 <div>
                   <MediaGallery
@@ -120,7 +191,6 @@ export default function EntryDetailModal({ entry, onClose }: EntryDetailModalPro
                 </div>
               )}
 
-              {/* Backward Compatibility Fallback */}
               {(!entry.media || entry.media.length === 0) && (
                 <>
                   {entry.image_url && (

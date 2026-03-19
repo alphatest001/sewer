@@ -55,7 +55,7 @@ export default function Login() {
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <img src="/logo.jpeg" alt="VARMAN Logo" className="h-16 mb-4 shadow-lg mx-auto object-contain" />
-          <h1 className="text-2xl font-bold text-gray-900">VARMAN Equipment Services</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Varman Equipments</h1>
           <p className="text-gray-500 mt-1">Work Management System</p>
         </div>
 

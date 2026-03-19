@@ -111,7 +111,7 @@ function AppContent() {
           <div className="flex items-center gap-3">
             <img src="/logo.jpeg" alt="VARMAN Logo" className="h-10 rounded-lg object-contain" />
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-gray-900">VARMAN Equipment Services</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Varman Equipments</h1>
               <p className="text-xs text-gray-500 hidden sm:block">Work Management System</p>
             </div>
           </div>

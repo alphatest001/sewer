@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, X, Trash2 } from 'lucide-react';
+import { X, Trash2, FileSpreadsheet, FileText, Download, ChevronDown } from 'lucide-react';
+import ExcelJS from 'exceljs';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import EntryDetailModal from './EntryDetailModal';
@@ -21,6 +24,18 @@ interface WorkEntry {
   ward: { name: string };
   location: { name: string };
   supervisor: { full_name: string };
+  entry_number: number;
+  entry_code: string;
+  media?: {
+    id: string;
+    media_type: 'photo' | 'video';
+    media_url: string;
+    file_name: string | null;
+    file_size: number | null;
+    display_order: number;
+    created_at: string;
+    updated_at: string;
+  }[];
 }
 
 interface City {
@@ -53,15 +68,16 @@ interface Supervisor {
 }
 
 export default function WorkHistory() {
-  const { user, authUser } = useAuth();
+  const { user } = useAuth();
   const [entries, setEntries] = useState<WorkEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<WorkEntry | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; entryId: string | null }>({
     isOpen: false,
     entryId: null,
   });
   const [isDeleting, setIsDeleting] = useState(false);
+  const [openDownloadMenuId, setOpenDownloadMenuId] = useState<string | null>(null);
 
   // Master data for filters
   const [cities, setCities] = useState<City[]>([]);
@@ -192,7 +208,7 @@ export default function WorkHistory() {
           supervisor:users!work_entries_supervisor_id_fkey(full_name),
           media:work_entry_media(*)
         `)
-        .order('work_date', { ascending: false });
+        .order('entry_number', { ascending: false });
 
       // Role-based filtering
       if (user.role === 'employee' || user.role === 'customer' || user.role === 'supervisor') {
@@ -311,6 +327,313 @@ export default function WorkHistory() {
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-GB');
+  };
+
+  const getMediaString = (entry: WorkEntry) => {
+    const photoCount = entry.media
+      ? entry.media.filter((media) => media.media_type === 'photo').length
+      : (entry.image_url ? 1 : 0);
+    const videoCount = entry.media
+      ? entry.media.filter((media) => media.media_type === 'video').length
+      : (entry.video_url ? 1 : 0);
+    if (photoCount === 0 && videoCount === 0) return 'None';
+    const parts: string[] = [];
+    if (photoCount > 0) parts.push(`${photoCount} photo${photoCount > 1 ? 's' : ''}`);
+    if (videoCount > 0) parts.push(`${videoCount} video${videoCount > 1 ? 's' : ''}`);
+    return parts.join(' + ');
+  };
+
+  const getLogoBuffer = async () => {
+    const logoRes = await fetch('/logo.jpeg');
+    return logoRes.arrayBuffer();
+  };
+
+  const getLogoBase64 = async () => {
+    const logoBuffer = await getLogoBuffer();
+    const logoUint8 = new Uint8Array(logoBuffer);
+    let binary = '';
+    for (let i = 0; i < logoUint8.length; i++) binary += String.fromCharCode(logoUint8[i]);
+    return btoa(binary);
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!filteredEntries.length) {
+      alert('No data to export.');
+      return;
+    }
+
+    const today = new Date().toLocaleDateString('en-GB');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Work History');
+    const logoBuffer = await getLogoBuffer();
+    const imageId = wb.addImage({ buffer: logoBuffer, extension: 'jpeg' });
+
+    ws.columns = [
+      { width: 12 },
+      { width: 12 },
+      { width: 18 },
+      { width: 14 },
+      { width: 12 },
+      { width: 12 },
+      { width: 30 },
+      { width: 10 },
+      { width: 22 },
+      { width: 24 },
+    ];
+
+    ws.mergeCells('A1:J1');
+    ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 40 } });
+    ws.getCell('B1').value = 'VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED';
+    ws.getCell('B1').font = { bold: true, size: 14 };
+
+    ws.mergeCells('A2:J2');
+    ws.getCell('A2').value = `Work History Report  ·  Generated: ${today}`;
+    ws.getCell('A2').font = { color: { argb: 'FFAAAAAA' }, size: 10 };
+
+    ws.addRow([]);
+
+    const headerRow = ws.addRow(['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'Hours', 'Supervisor', 'Media']);
+    headerRow.eachCell(cell => {
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } };
+      cell.alignment = { horizontal: 'left', vertical: 'middle' };
+    });
+
+    filteredEntries.forEach((entry, index) => {
+      ws.addRow([
+        index + 1,
+        entry.entry_code || '',
+        entry.city?.name || '',
+        formatDate(entry.work_date),
+        entry.zone?.name || '',
+        entry.ward?.name || '',
+        entry.location?.name || '',
+        (entry.chmr - entry.shmr).toFixed(1),
+        entry.supervisor?.full_name || '',
+        getMediaString(entry),
+      ]);
+    });
+
+    ws.addRow([]);
+
+    [
+      'CIN: U29113KA2021PTC148527  ·  Reg: 17 Jun 2021',
+      'No. 4, 6th Cross, Dhanalakshmi Layout, Vidyanarayanpura, Yelahanka, Bengaluru – 560097, Karnataka',
+      'Email: deva@dmvarman.com',
+    ].forEach((text) => {
+      const rowNumber = ws.rowCount + 1;
+      ws.mergeCells(`A${rowNumber}:J${rowNumber}`);
+      const cell = ws.getCell(`A${rowNumber}`);
+      cell.value = text;
+      cell.font = { size: 8, color: { argb: 'FF888888' } };
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `work-history-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!filteredEntries.length) {
+      alert('No data to export.');
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const today = new Date().toLocaleDateString('en-GB');
+    const logoBase64 = await getLogoBase64();
+
+    doc.addImage(logoBase64, 'JPEG', 14, 8, 30, 12);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text('VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED', 50, 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Work History Report  ·  Generated: ${today}`, 50, 20);
+
+    const tableRows = filteredEntries.map((entry, index) => [
+      index + 1,
+      entry.entry_code || '',
+      entry.city?.name || '',
+      formatDate(entry.work_date),
+      entry.zone?.name || '',
+      entry.ward?.name || '',
+      entry.location?.name || '',
+      (entry.chmr - entry.shmr).toFixed(1),
+      entry.supervisor?.full_name || '',
+      getMediaString(entry),
+    ]);
+
+    autoTable(doc, {
+      head: [['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'Hours', 'Supervisor', 'Media']],
+      body: tableRows,
+      startY: 28,
+      styles: { fontSize: 8, cellPadding: 2.5, valign: 'middle' },
+      headStyles: {
+        fillColor: [234, 88, 12],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'left',
+      },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 18 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 20 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 16 },
+        6: { cellWidth: 45 },
+        7: { cellWidth: 13, halign: 'center' },
+        8: { cellWidth: 28 },
+        9: { cellWidth: 32 },
+      },
+      margin: { left: 14, right: 14 },
+      didDrawPage: (data) => {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        doc.setDrawColor(200, 200, 200);
+        doc.line(14, pageHeight - 18, pageWidth - 14, pageHeight - 18);
+        doc.setFontSize(7);
+        doc.setTextColor(130, 130, 130);
+        doc.setFont('helvetica', 'normal');
+        doc.text('CIN: U29113KA2021PTC148527  ·  No. 4, 6th Cross, Dhanalakshmi Layout, Vidyanarayanpura, Yelahanka, Bengaluru – 560097', 14, pageHeight - 13);
+        doc.text('Email: deva@dmvarman.com', 14, pageHeight - 8);
+        doc.text(`Page ${data.pageNumber}`, pageWidth - 20, pageHeight - 8);
+      },
+    });
+
+    doc.save(`work-history-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
+
+  const handleDownloadSingleExcel = async (entry: WorkEntry) => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Work Entry');
+    const logoBuffer = await getLogoBuffer();
+    const imageId = wb.addImage({ buffer: logoBuffer, extension: 'jpeg' });
+
+    ws.columns = [{ width: 18 }, { width: 52 }];
+    ws.getRow(1).height = 45;
+    ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 40 } });
+    ws.getCell('B1').value = 'VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED';
+    ws.getCell('B1').font = { bold: true, size: 14 };
+
+    ws.addRow([]);
+
+    ws.getCell('A3').value = 'Work Entry Report';
+    ws.getCell('B3').value = `Ref: ${entry.entry_code}`;
+    ws.getCell('B3').font = { color: { argb: 'FF888888' } };
+    ws.getCell('B3').alignment = { horizontal: 'right' };
+
+    ws.addRow([]);
+
+    const dataRows: [string, string][] = [
+      ['City', entry.city?.name || ''],
+      ['Date', formatDate(entry.work_date)],
+      ['Zone', entry.zone?.name || ''],
+      ['Ward', entry.ward?.name || ''],
+      ['Location', entry.location?.name || ''],
+      ['Hours', (entry.chmr - entry.shmr).toFixed(1)],
+      ['Supervisor', entry.supervisor?.full_name || ''],
+      ['Media', getMediaString(entry)],
+    ];
+
+    dataRows.forEach(([key, value]) => {
+      const row = ws.addRow([key, value]);
+      row.getCell(1).font = { bold: true };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+    });
+
+    ws.addRow([]);
+
+    const dividerRow = ws.addRow(['', '']);
+    dividerRow.height = 4;
+    dividerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
+    });
+
+    [
+      'CIN: U29113KA2021PTC148527  ·  Reg: 17 Jun 2021',
+      'No. 4, 6th Cross, Dhanalakshmi Layout, Vidyanarayanpura, Yelahanka, Bengaluru – 560097, Karnataka',
+      'Email: deva@dmvarman.com',
+    ].forEach((text) => {
+      const rowNumber = ws.rowCount + 1;
+      ws.mergeCells(`A${rowNumber}:B${rowNumber}`);
+      const cell = ws.getCell(`A${rowNumber}`);
+      cell.value = text;
+      cell.font = { size: 8, color: { argb: 'FF888888' } };
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `work-entry-${entry.entry_code}-${entry.work_date}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadSinglePDF = async (entry: WorkEntry) => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const logoBase64 = await getLogoBase64();
+
+    doc.addImage(logoBase64, 'JPEG', 14, 8, 28, 11);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text('VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED', 48, 13);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text('Work Entry Report', 48, 20);
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    const refCode = entry.entry_code || '';
+    doc.text(`Ref: ${refCode}`, 196, 20, { align: 'right' });
+    doc.setDrawColor(220, 220, 220);
+    doc.line(14, 24, 196, 24);
+
+    autoTable(doc, {
+      body: [
+        ['City', entry.city?.name || ''],
+        ['Date', formatDate(entry.work_date)],
+        ['Zone', entry.zone?.name || ''],
+        ['Ward', entry.ward?.name || ''],
+        ['Location', entry.location?.name || ''],
+        ['Hours', (entry.chmr - entry.shmr).toFixed(1)],
+        ['Supervisor', entry.supervisor?.full_name || ''],
+        ['Media', getMediaString(entry)],
+      ],
+      startY: 28,
+      styles: { fontSize: 10, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 38, fontStyle: 'bold', fillColor: [249, 250, 251], textColor: [80, 80, 80] },
+        1: { cellWidth: 145, textColor: [30, 30, 30] },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const footerY = pageHeight - 28;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, footerY, 196, footerY);
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont('helvetica', 'normal');
+    doc.text('VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED', 14, footerY + 6);
+    doc.text('CIN: U29113KA2021PTC148527  ·  Reg: 17 Jun 2021', 14, footerY + 11);
+    doc.text('No. 4, 6th Cross, Dhanalakshmi Layout, Vidyanarayanpura, Yelahanka, Bengaluru – 560097, Karnataka', 14, footerY + 16);
+    doc.text('Email: deva@dmvarman.com', 14, footerY + 21);
+
+    doc.save(`work-entry-${entry.entry_code || entry.work_date}.pdf`);
   };
 
   if (loading) {
@@ -469,10 +792,29 @@ export default function WorkHistory() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        {user?.role === 'admin' && filteredEntries.length > 0 && (
+          <div className="flex items-center justify-end gap-3 px-6 py-3 border-b border-gray-100 bg-gray-50">
+            <button
+              onClick={handleDownloadExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Download Excel
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Download PDF
+            </button>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entry #</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zone</th>
@@ -481,15 +823,13 @@ export default function WorkHistory() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supervisor</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Media</th>
-                {user?.role === 'admin' && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'admin' ? 9 : 8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={10} className="px-6 py-12 text-center text-gray-500">
                     No entries found. {user?.role === 'employee' ? 'Create your first work entry!' : 'Adjust your filters or check back later.'}
                   </td>
                 </tr>
@@ -497,14 +837,12 @@ export default function WorkHistory() {
                 filteredEntries.map(entry => {
                   const hours = (entry.chmr - entry.shmr).toFixed(1);
 
-                  // Count media from new table, fallback to old columns
-                  const entryWithMedia = entry as any;
-                  const photoCount = entryWithMedia.media
-                    ? entryWithMedia.media.filter((m: any) => m.media_type === 'photo').length
+                  const photoCount = entry.media
+                    ? entry.media.filter((media) => media.media_type === 'photo').length
                     : (entry.image_url ? 1 : 0);
 
-                  const videoCount = entryWithMedia.media
-                    ? entryWithMedia.media.filter((m: any) => m.media_type === 'video').length
+                  const videoCount = entry.media
+                    ? entry.media.filter((media) => media.media_type === 'video').length
                     : (entry.video_url ? 1 : 0);
 
                   const hasMedia = photoCount > 0 || videoCount > 0;
@@ -515,6 +853,7 @@ export default function WorkHistory() {
                       onClick={() => setSelectedEntry(entry)}
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
                     >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-orange-600 font-medium">{entry.entry_code || '—'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.city.name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(entry.work_date)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.zone.name}</td>
@@ -533,19 +872,59 @@ export default function WorkHistory() {
                           <span className="text-gray-400">None</span>
                         )}
                       </td>
-                      {user?.role === 'admin' && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteClick(entry.id);
-                            }}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDownloadMenuId(openDownloadMenuId === entry.id ? null : entry.id);
+                              }}
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                              <ChevronDown className="w-3 h-3" />
+                            </button>
+                            {openDownloadMenuId === entry.id && (
+                              <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[150px]">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadSingleExcel(entry);
+                                    setOpenDownloadMenuId(null);
+                                  }}
+                                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                                  Excel (.xlsx)
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadSinglePDF(entry);
+                                    setOpenDownloadMenuId(null);
+                                  }}
+                                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                  <FileText className="w-4 h-4 text-red-600" />
+                                  PDF (.pdf)
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {user?.role === 'admin' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClick(entry.id);
+                              }}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -559,6 +938,11 @@ export default function WorkHistory() {
         <EntryDetailModal
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
+          isAdmin={user?.role === 'admin'}
+          onUpdate={(updated) => {
+            setEntries(prev => prev.map(e => e.id === updated.id ? { ...e, shmr: updated.shmr, chmr: updated.chmr } : e));
+            setSelectedEntry(updated);
+          }}
         />
       )}
 
@@ -573,6 +957,13 @@ export default function WorkHistory() {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
+
+      {openDownloadMenuId && (
+        <div
+          className="fixed inset-0 z-10"
+          onClick={() => setOpenDownloadMenuId(null)}
+        />
+      )}
     </div>
   );
 }

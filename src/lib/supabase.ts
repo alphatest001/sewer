@@ -80,5 +80,7 @@ export interface WorkEntry {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  entry_number: number;
+  entry_code: string;
   media?: WorkEntryMedia[];
 }
