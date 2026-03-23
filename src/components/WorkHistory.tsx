@@ -376,23 +376,25 @@ export default function WorkHistory() {
       { width: 12 },
       { width: 12 },
       { width: 30 },
+      { width: 12 },
+      { width: 12 },
       { width: 10 },
       { width: 22 },
       { width: 24 },
     ];
 
-    ws.mergeCells('A1:J1');
+    ws.mergeCells('A1:L1');
     ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 120, height: 40 } });
     ws.getCell('B1').value = 'VARMAN HEAVY EQUIPMENTS PRIVATE LIMITED';
     ws.getCell('B1').font = { bold: true, size: 14 };
 
-    ws.mergeCells('A2:J2');
+    ws.mergeCells('A2:L2');
     ws.getCell('A2').value = `Work History Report  ·  Generated: ${today}`;
     ws.getCell('A2').font = { color: { argb: 'FFAAAAAA' }, size: 10 };
 
     ws.addRow([]);
 
-    const headerRow = ws.addRow(['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'Hours', 'Supervisor', 'Media']);
+    const headerRow = ws.addRow(['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'SHMR', 'CHMR', 'Hours', 'Supervisor', 'Media']);
     headerRow.eachCell(cell => {
       cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEA580C' } };
@@ -408,6 +410,8 @@ export default function WorkHistory() {
         entry.zone?.name || '',
         entry.ward?.name || '',
         entry.location?.name || '',
+        entry.shmr?.toString() || '0',
+        entry.chmr?.toString() || '0',
         (entry.chmr - entry.shmr).toFixed(1),
         entry.supervisor?.full_name || '',
         getMediaString(entry),
@@ -422,7 +426,7 @@ export default function WorkHistory() {
       'Email: deva@dmvarman.com',
     ].forEach((text) => {
       const rowNumber = ws.rowCount + 1;
-      ws.mergeCells(`A${rowNumber}:J${rowNumber}`);
+      ws.mergeCells(`A${rowNumber}:L${rowNumber}`);
       const cell = ws.getCell(`A${rowNumber}`);
       cell.value = text;
       cell.font = { size: 8, color: { argb: 'FF888888' } };
@@ -466,13 +470,15 @@ export default function WorkHistory() {
       entry.zone?.name || '',
       entry.ward?.name || '',
       entry.location?.name || '',
+      entry.shmr?.toString() || '0',
+      entry.chmr?.toString() || '0',
       (entry.chmr - entry.shmr).toFixed(1),
       entry.supervisor?.full_name || '',
       getMediaString(entry),
     ]);
 
     autoTable(doc, {
-      head: [['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'Hours', 'Supervisor', 'Media']],
+      head: [['S.No', 'Ref No', 'City', 'Date', 'Zone', 'Ward', 'Location', 'SHMR', 'CHMR', 'Hours', 'Supervisor', 'Media']],
       body: tableRows,
       startY: 28,
       styles: { fontSize: 8, cellPadding: 2.5, valign: 'middle' },
@@ -488,12 +494,14 @@ export default function WorkHistory() {
         1: { cellWidth: 18 },
         2: { cellWidth: 20 },
         3: { cellWidth: 20 },
-        4: { cellWidth: 16 },
-        5: { cellWidth: 16 },
-        6: { cellWidth: 45 },
+        4: { cellWidth: 14 },
+        5: { cellWidth: 14 },
+        6: { cellWidth: 35 },
         7: { cellWidth: 13, halign: 'center' },
-        8: { cellWidth: 28 },
-        9: { cellWidth: 32 },
+        8: { cellWidth: 13, halign: 'center' },
+        9: { cellWidth: 13, halign: 'center' },
+        10: { cellWidth: 24 },
+        11: { cellWidth: 24 },
       },
       margin: { left: 14, right: 14 },
       didDrawPage: (data) => {
@@ -540,6 +548,8 @@ export default function WorkHistory() {
       ['Zone', entry.zone?.name || ''],
       ['Ward', entry.ward?.name || ''],
       ['Location', entry.location?.name || ''],
+      ['SHMR (Start Hour Meter Reading)', entry.shmr?.toString() || '0'],
+      ['CHMR (Closing Hour Meter Reading)', entry.chmr?.toString() || '0'],
       ['Hours', (entry.chmr - entry.shmr).toFixed(1)],
       ['Supervisor', entry.supervisor?.full_name || ''],
       ['Media', getMediaString(entry)],
@@ -608,6 +618,8 @@ export default function WorkHistory() {
         ['Zone', entry.zone?.name || ''],
         ['Ward', entry.ward?.name || ''],
         ['Location', entry.location?.name || ''],
+        ['SHMR (Start Hour Meter Reading)', entry.shmr?.toString() || '0'],
+        ['CHMR (Closing Hour Meter Reading)', entry.chmr?.toString() || '0'],
         ['Hours', (entry.chmr - entry.shmr).toFixed(1)],
         ['Supervisor', entry.supervisor?.full_name || ''],
         ['Media', getMediaString(entry)],
